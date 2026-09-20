@@ -17,10 +17,20 @@ A browser-based app for plotting DFT defect formation energies and thermodynamic
 ### Defect table example (illustrative values only)
 
 ```csv
-defect,charge,E_tot,E_corr,Zn,O
-V_O,0,-94.0,0.0,0,-1
-V_O,1,-95.0,0.2,0,-1
-V_Zn,0,-98.0,0.0,-1,0
+defect,charge,E_tot,E_corr,Cu,In,Se
+V_Cu,0,-1119.0167,0.00,-1,0,0
+V_Cu,-1,-1116.9424,0.11,-1,0,0
+Cu_In,0,-1121.8867,0.00,1,-1,0
+Cu_In,-1,-1119.5524,0.11,1,-1,0
+Cu_In,-2,-1117.1481,0.44,1,-1,0
+In_Cu,2,-1126.4253,0.44,-1,1,0
+In_Cu,1,-1123.6910,0.11,-1,1,0
+In_Cu,0,-1121.0867,0.00,-1,1,0
+V_Se,2,-1121.8853,0.44,0,0,-1
+V_Se,1,-1118.6510,0.11,0,0,-1
+V_Se,0,-1116.0367,0.00,0,0,-1
+Cu_i,1,-1127.6410,0.11,1,0,0
+Cu_i,0,-1125.1767,0.00,1,0,0
 ```
 
 `E_corr` is optional (omitting the column means zero); when present every cell must be numeric. Use integer charge states and integer changes in atom counts. Quoted names containing commas are supported. Each record must occupy one line. Multiple configurations of the same defect and charge are allowed: the lowest energy is used.
