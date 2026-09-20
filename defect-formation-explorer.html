@@ -1,0 +1,1947 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--
+  Defect Formation Explorer - standalone edition
+  Formation energy diagrams from DFT defect calculations, with chemical potential
+  limits solved from competing phases and a publication figure exporter.
+
+  Self-contained: open this file in any modern browser. No install, no account,
+  no server. Your data stays in your browser and is never uploaded anywhere.
+  An internet connection only affects the interface webfont; everything else,
+  including all exports, works fully offline.
+-->
+<style>
+  :root{ color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body{ margin:0; font:14px system-ui, -apple-system, "Segoe UI", sans-serif; background:#fafaf8; }
+  img{ max-width:100%; }
+  [hidden]{ display:none !important; }
+</style>
+<title>Defect Formation Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;1,400&display=swap">
+
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f1f4f5;
+  --surface:#ffffff;
+  --surface-2:#f7f9fa;
+  --sunk:#eaeef0;
+  --ink:#0e1519;
+  --ink-2:#4b5760;
+  --ink-3:#7d8a93;
+  --line:#dbe2e6;
+  --line-2:#c6d0d6;
+  --accent:#1c5cab;
+  --accent-soft:#e4edf9;
+  --warn:#b45309;
+  --warn-soft:#fdf2e3;
+  --bad:#b42318;
+  --grid:#e7ecef;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  --shadow:0 1px 2px rgba(14,21,25,.06), 0 8px 24px -12px rgba(14,21,25,.18);
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --sans:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif:"IBM Plex Serif", Georgia, serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0e1214;
+    --surface:#171c1f;
+    --surface-2:#1d2326;
+    --sunk:#12171a;
+    --ink:#eef3f5;
+    --ink-2:#a6b2ba;
+    --ink-3:#74818a;
+    --line:#2a3237;
+    --line-2:#39434a;
+    --accent:#3987e5;
+    --accent-soft:#16243a;
+    --warn:#e0a458;
+    --warn-soft:#2a2115;
+    --bad:#e66767;
+    --grid:#222a2e;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0e1214;
+  --surface:#171c1f;
+  --surface-2:#1d2326;
+  --sunk:#12171a;
+  --ink:#eef3f5;
+  --ink-2:#a6b2ba;
+  --ink-3:#74818a;
+  --line:#2a3237;
+  --line-2:#39434a;
+  --accent:#3987e5;
+  --accent-soft:#16243a;
+  --warn:#e0a458;
+  --warn-soft:#2a2115;
+  --bad:#e66767;
+  --grid:#222a2e;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--sans); font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{margin:0; text-wrap:balance; font-weight:600; letter-spacing:-.011em}
+p{margin:0}
+button,input,select,textarea{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+
+/* ---------- shell ---------- */
+.wrap{max-width:1400px; margin:0 auto; padding-inline:16px; padding-block:0 56px}
+
+header.top{
+  position:sticky; top:env(safe-area-inset-top, 0px); z-index:40;
+  background:color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.top-in{
+  max-width:1400px; margin:0 auto; padding:12px 16px;
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+}
+.brand{display:flex; align-items:baseline; gap:10px; min-width:0}
+.brand h1{font-size:16px; letter-spacing:-.02em}
+.brand .sub{
+  font-family:var(--mono); font-size:10.5px; text-transform:uppercase;
+  letter-spacing:.09em; color:var(--ink-3); white-space:nowrap;
+}
+.chips{display:flex; gap:6px; flex-wrap:wrap; margin-left:auto}
+.chip{
+  font-family:var(--mono); font-size:11px; padding:3px 8px;
+  background:var(--surface); border:1px solid var(--line); border-radius:999px;
+  color:var(--ink-2); white-space:nowrap;
+}
+.chip b{color:var(--ink); font-weight:600}
+
+/* ---------- layout ---------- */
+.grid{display:grid; grid-template-columns:352px minmax(0,1fr); gap:16px; margin-top:16px; align-items:start}
+@media (max-width:1000px){ .grid{grid-template-columns:1fr} }
+
+.panel{
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:10px; box-shadow:var(--shadow);
+}
+.panel-head{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:12px 14px; border-bottom:1px solid var(--line);
+}
+.panel-head h2{font-size:13px; letter-spacing:-.005em}
+.panel-head .hint{font-family:var(--mono); font-size:10.5px; color:var(--ink-3); letter-spacing:.02em}
+.panel-body{padding:14px}
+.rail{display:flex; flex-direction:column; gap:16px; position:sticky; top:calc(env(safe-area-inset-top, 0px) + 68px)}
+@media (max-width:1000px){ .rail{position:static} }
+.main{display:flex; flex-direction:column; gap:16px; min-width:0}
+
+/* ---------- forms ---------- */
+.field{display:flex; flex-direction:column; gap:4px}
+.field label, .lbl{
+  font-family:var(--mono); font-size:10px; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--ink-3);
+}
+input[type=text], input[type=number], textarea, select{
+  width:100%; background:var(--surface-2); border:1px solid var(--line-2);
+  border-radius:6px; padding:6px 8px; font-family:var(--mono); font-size:12.5px;
+  font-variant-numeric:tabular-nums;
+}
+input:disabled{background:var(--sunk); color:var(--ink-3)}
+textarea{line-height:1.5; resize:vertical; white-space:pre; overflow-wrap:normal; overflow-x:auto}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.row3{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+.stack{display:flex; flex-direction:column; gap:10px}
+
+.btn{
+  background:var(--surface-2); border:1px solid var(--line-2); border-radius:6px;
+  padding:5px 11px; font-size:12.5px; font-weight:500; cursor:pointer;
+  transition:background .12s, border-color .12s;
+}
+.btn:hover{background:var(--sunk); border-color:var(--ink-3)}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.sm{padding:3px 8px; font-size:11.5px}
+.btnrow{display:flex; gap:8px; flex-wrap:wrap}
+
+details.sec{border-top:1px solid var(--line)}
+details.sec:first-of-type{border-top:0}
+details.sec > summary{
+  list-style:none; cursor:pointer; padding:11px 14px;
+  display:flex; align-items:center; gap:8px;
+  font-size:12.5px; font-weight:600;
+}
+details.sec > summary::-webkit-details-marker{display:none}
+details.sec > summary::before{
+  content:""; width:5px; height:5px; border-right:1.5px solid var(--ink-3);
+  border-bottom:1.5px solid var(--ink-3); transform:rotate(-45deg) translate(-1px,-1px);
+  transition:transform .15s;
+}
+details.sec[open] > summary::before{transform:rotate(45deg) translate(-1px,-1px)}
+details.sec > summary .tag{
+  margin-left:auto; font-family:var(--mono); font-size:10.5px;
+  color:var(--ink-3); font-weight:400;
+}
+details.sec .inner{padding:0 14px 14px}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse; width:100%; font-family:var(--mono); font-size:12px; font-variant-numeric:tabular-nums}
+th{
+  text-align:left; font-weight:500; font-size:10px; text-transform:uppercase;
+  letter-spacing:.07em; color:var(--ink-3); padding:6px 10px 6px 0;
+  border-bottom:1px solid var(--line-2); white-space:nowrap;
+}
+td{padding:6px 10px 6px 0; border-bottom:1px solid var(--grid); white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num, th.num{text-align:right; padding-right:14px}
+.swatch{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:7px; vertical-align:baseline}
+
+/* ---------- legend ---------- */
+.legend{display:flex; gap:6px; flex-wrap:wrap}
+.lg{
+  display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  border:1px solid var(--line-2); background:var(--surface-2);
+  border-radius:999px; padding:3px 10px 3px 8px;
+  font-family:var(--mono); font-size:11.5px; transition:opacity .12s;
+}
+.lg .dot{width:8px; height:8px; border-radius:2px}
+.lg.off{opacity:.38}
+.lg:hover{border-color:var(--ink-3)}
+
+/* ---------- charts ---------- */
+.chartbox{position:relative; width:100%}
+.chartbox svg{display:block; width:100%; height:auto}
+.tip{
+  position:absolute; pointer-events:none; z-index:20; opacity:0;
+  transition:opacity .09s; transform:translate(-50%,-100%);
+  background:var(--surface); border:1px solid var(--line-2); border-radius:7px;
+  box-shadow:var(--shadow); padding:8px 10px; min-width:150px;
+  font-family:var(--mono); font-size:11.5px; font-variant-numeric:tabular-nums;
+}
+.tip.on{opacity:1}
+.tip .th{font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-3); margin-bottom:5px}
+.tip .tr{display:flex; align-items:center; gap:7px; justify-content:space-between; padding:1px 0}
+.tip .tr .nm{display:flex; align-items:center; gap:6px}
+.tip .tr .dot{width:7px; height:7px; border-radius:2px; flex:none}
+
+/* ---------- notes / status ---------- */
+.note{
+  font-size:12px; color:var(--ink-2); background:var(--surface-2);
+  border:1px solid var(--line); border-left:2px solid var(--line-2);
+  border-radius:0 6px 6px 0; padding:8px 11px;
+}
+.note.warn{background:var(--warn-soft); border-left-color:var(--warn); color:var(--ink)}
+.note.bad{background:var(--warn-soft); border-left-color:var(--bad); color:var(--ink)}
+.note code, code{font-family:var(--mono); font-size:.92em; background:var(--sunk); padding:1px 4px; border-radius:3px}
+.eq{
+  font-family:var(--serif); font-size:14px; line-height:2.05; color:var(--ink);
+  background:var(--surface-2); border:1px solid var(--line); border-radius:8px;
+  padding:12px 14px;
+}
+th .nt{text-transform:none; letter-spacing:0}
+.eq i{font-style:italic}
+.eq sub{font-size:.68em}
+.eq sup{font-size:.68em}
+.eq .k{color:var(--accent); font-style:italic}
+.vtx-btn{
+  display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+  border:1px solid var(--line-2); background:var(--surface-2); border-radius:6px;
+  padding:6px 9px; cursor:pointer; font-family:var(--mono); font-size:11.5px;
+  font-variant-numeric:tabular-nums; transition:background .12s, border-color .12s;
+}
+.vtx-btn:hover{border-color:var(--ink-3)}
+.vtx-btn.sel{background:var(--accent-soft); border-color:var(--accent)}
+.vtx-btn .id{
+  width:18px; height:18px; flex:none; border-radius:4px; display:grid; place-items:center;
+  background:var(--sunk); font-size:10.5px; font-weight:600;
+}
+.vtx-btn.sel .id{background:var(--accent); color:#fff}
+.vtx-list{display:flex; flex-direction:column; gap:5px; max-height:250px; overflow-y:auto}
+.region-grid{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:18px}
+@media (max-width:820px){ .region-grid{grid-template-columns:1fr} }
+
+/* ---------- publication figure ---------- */
+.figstage{
+  background:#ffffff; border:1px solid var(--line-2); border-radius:8px;
+  padding:18px; display:flex; justify-content:center; overflow-x:auto;
+}
+.figstage svg{max-width:100%; height:auto; display:block}
+.figctl{display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:10px 12px}
+.figctl .field input, .figctl .field select{padding:4px 6px; font-size:12px}
+.figgroup{border:1px solid var(--line); border-radius:8px; padding:11px 12px; background:var(--surface-2)}
+.figgroup > .lbl{display:block; margin-bottom:9px}
+.condrow{display:grid; grid-template-columns:22px minmax(0,1fr) minmax(0,1.2fr); gap:8px; align-items:center}
+.condrow .pl{
+  font-family:var(--mono); font-size:11px; font-weight:600; color:var(--ink-2);
+  text-align:center;
+}
+.dtbl{width:100%; border-collapse:collapse}
+.dtbl td{border:0; padding:3px 6px 3px 0; white-space:nowrap}
+.dtbl input[type=color]{
+  width:26px; height:22px; padding:1px; border-radius:4px; border:1px solid var(--line-2);
+  background:var(--surface-2); cursor:pointer;
+}
+.dtbl input[type=text]{padding:3px 6px; font-size:12px}
+.dtbl input[type=checkbox]{accent-color:var(--accent); cursor:pointer}
+.togwrap{display:flex; flex-wrap:wrap; gap:9px 16px}
+.dim{display:inline-flex; gap:5px; align-items:baseline; font-family:var(--mono); font-size:11px; color:var(--ink-3)}
+.dim b{color:var(--ink); font-weight:600}
+.flexline{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+.spacer{flex:1}
+.toggle{display:inline-flex; align-items:center; gap:7px; cursor:pointer; font-size:12.5px; user-select:none}
+.toggle input{width:auto; margin:0; accent-color:var(--accent)}
+.muted{color:var(--ink-3)}
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <h1>Defect Formation Explorer</h1>
+      <span class="sub">DFT post-processing</span>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="grid">
+
+  <!-- ============ LEFT RAIL ============ -->
+  <div class="rail">
+    <div class="panel">
+      <div class="panel-head"><h2>Inputs</h2><span class="hint" id="src-tag">example data</span></div>
+
+      <details class="sec" open>
+        <summary>Host system <span class="tag" id="tag-host"></span></summary>
+        <div class="inner stack">
+          <div class="row2">
+            <div class="field"><label for="f-host">Host formula</label>
+              <input type="text" id="f-host" value="CuInSe2"></div>
+            <div class="field"><label for="f-dhf">Δ<i>H</i><sub>f</sub> host (eV/f.u.)</label>
+              <input type="number" id="f-dhf" step="0.01" value="-2.37"></div>
+          </div>
+          <div class="row3">
+            <div class="field"><label for="f-bulk">E<sub>tot</sub> bulk (eV)</label>
+              <input type="number" id="f-bulk" step="0.0001" value="-1123.4567"></div>
+            <div class="field"><label for="f-vbm">E<sub>VBM</sub> (eV)</label>
+              <input type="number" id="f-vbm" step="0.0001" value="2.1543"></div>
+            <div class="field"><label for="f-gap">Gap (eV)</label>
+              <input type="number" id="f-gap" step="0.01" value="1.04"></div>
+          </div>
+          <div>
+            <div class="lbl" style="margin-bottom:5px">Elemental references μ<sub>i</sub><sup>ref</sup> (eV/atom)</div>
+            <div id="muref-grid" class="row3"></div>
+          </div>
+          <div class="note">Elements are taken from the host formula. Set a reference to
+            <code>0</code> if your total energies already use Δμ directly.</div>
+        </div>
+      </details>
+
+      <details class="sec">
+        <summary>Defect entries <span class="tag" id="tag-def"></span></summary>
+        <div class="inner stack">
+          <div class="note">One row per defect <em>and</em> charge state. Element columns hold
+            Δ<i>n</i> — atoms added (+) or removed (−) versus the bulk supercell.</div>
+          <textarea id="ta-def" rows="8" spellcheck="false" aria-label="Defect CSV"></textarea>
+          <div class="btnrow">
+            <button class="btn sm primary" id="b-def">Load defects</button>
+            <label class="btn sm" style="cursor:pointer">Upload CSV
+              <input type="file" id="u-def" accept=".csv,.tsv,.txt" hidden></label>
+          </div>
+        </div>
+      </details>
+
+      <details class="sec">
+        <summary>Competing phases <span class="tag" id="tag-ph"></span></summary>
+        <div class="inner stack">
+          <div class="note">Formation enthalpy per formula unit. Give element columns, or
+            leave them out and the formula in <code>phase</code> is parsed. Elemental
+            phases are always included automatically.</div>
+          <textarea id="ta-ph" rows="6" spellcheck="false" aria-label="Competing phase CSV"></textarea>
+          <div class="btnrow">
+            <button class="btn sm primary" id="b-ph">Load phases</button>
+            <label class="btn sm" style="cursor:pointer">Upload CSV
+              <input type="file" id="u-ph" accept=".csv,.tsv,.txt" hidden></label>
+          </div>
+        </div>
+      </details>
+
+      <details class="sec">
+        <summary>Reset</summary>
+        <div class="inner btnrow">
+          <button class="btn sm" id="b-demo">Reload example (CuInSe₂)</button>
+        </div>
+      </details>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Convention</h2></div>
+      <div class="panel-body stack">
+        <div class="eq">
+          <i>E</i><sup>f</sup>[<i>D</i><sup>q</sup>] =
+          <i>E</i><sub>tot</sub>[<i>D</i><sup>q</sup>] − <i>E</i><sub>tot</sub>[bulk]
+          − Σ<sub>i</sub> Δ<i>n<sub>i</sub></i> (μ<sub>i</sub><sup>ref</sup> + Δμ<sub>i</sub>)
+          + <i>q</i>(<i>E</i><sub>VBM</sub> + <span class="k">E</span><sub>F</sub>)
+          + <i>E</i><sub>corr</sub>
+        </div>
+        <p style="font-size:12px; color:var(--ink-2)">
+          <b>E</b><sub>F</sub> is referenced to the VBM. <i>E</i><sub>corr</sub> is whatever
+          finite-size correction you supply per entry — FNV, eFNV, Lany–Zunger — the app
+          treats it as a fixed additive term and never recomputes it. Potential alignment
+          should already be folded into that number.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Chemical potential stability region</h2>
+        <span class="hint" id="region-dim"></span>
+        <div class="spacer"></div>
+        <div class="flexline">
+          <label class="lbl" for="ax-x">x</label><select id="ax-x" style="width:auto"></select>
+          <label class="lbl" for="ax-y">y</label><select id="ax-y" style="width:auto"></select>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="region-grid" id="region-grid">
+          <div class="chartbox" id="cb-region">
+            <svg id="svg-region" role="img" aria-label="Chemical potential stability region"></svg>
+            <div class="tip" id="tip-region"></div>
+          </div>
+          <div class="stack" style="min-width:0">
+            <div>
+              <div class="lbl" style="margin-bottom:6px">Vertices — pick a growth condition</div>
+              <div class="vtx-list" id="vtx-list"></div>
+            </div>
+            <div>
+              <div class="lbl" style="margin-bottom:6px">Δμ in use (eV)</div>
+              <div id="dmu-inputs" class="stack" style="gap:6px"></div>
+            </div>
+            <div id="feas"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Formation energy vs Fermi level</h2>
+        <span class="hint" id="cond-tag"></span>
+        <div class="spacer"></div>
+        <label class="toggle"><input type="checkbox" id="t-all"> all charge states</label>
+        <label class="toggle"><input type="checkbox" id="t-lbl" checked> labels</label>
+        <button class="btn sm" id="b-svg">Copy SVG</button>
+      </div>
+      <div class="panel-body stack">
+        <div class="legend" id="legend"></div>
+        <div class="chartbox" id="cb-main">
+          <svg id="svg-main" role="img" aria-label="Defect formation energy versus Fermi level"></svg>
+          <div class="tip" id="tip-main"></div>
+        </div>
+        <div id="main-msg"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Publication figure</h2>
+        <span class="hint" id="fig-dim"></span>
+        <div class="spacer"></div>
+        <button class="btn sm" id="b-png" hidden>Download PNG · 300 dpi</button>
+        <button class="btn sm" id="b-png6" hidden>600 dpi</button>
+        <button class="btn sm" id="b-svgdl" hidden>SVG</button>
+        <button class="btn sm" id="b-figcopy">Copy SVG</button>
+      </div>
+      <div class="panel-body stack" style="gap:16px">
+
+        <div class="figstage"><div id="fig-prev"></div></div>
+        <div id="fig-msg"></div>
+
+        <div class="figgroup">
+          <span class="lbl">Growth conditions</span>
+          <div class="flexline" style="margin-bottom:10px">
+            <span class="lbl">panels</span>
+            <select id="f-n" style="width:auto"><option>1</option><option>2</option><option>3</option></select>
+            <span class="muted" style="font-size:12px">each panel is the same defect set at a different Δμ</span>
+          </div>
+          <div class="stack" style="gap:7px" id="cond-rows"></div>
+        </div>
+
+        <div class="figgroup">
+          <span class="lbl">Size and type</span>
+          <div class="figctl">
+            <div class="field"><label for="f-preset">Width preset</label>
+              <select id="f-preset">
+                <option value="3.3">Single column · 3.3 in</option>
+                <option value="3.504">Nature single · 89 mm</option>
+                <option value="7.0">Double column · 7.0 in</option>
+                <option value="7.205">Nature double · 183 mm</option>
+                <option value="custom">Custom</option>
+              </select></div>
+            <div class="field"><label for="f-w">Width (in)</label>
+              <input type="number" id="f-w" step="0.05" min="1.5" max="14" value="3.3"></div>
+            <div class="field"><label for="f-h">Height (in)</label>
+              <input type="number" id="f-h" step="0.05" min="1.2" max="14" value="2.7"></div>
+            <div class="field"><label for="f-font">Typeface</label>
+              <select id="f-font">
+                <option value="sans">Sans · Helvetica/Arial</option>
+                <option value="serif">Serif · Times</option>
+              </select></div>
+            <div class="field"><label for="f-fs">Font size (pt)</label>
+              <input type="number" id="f-fs" step="0.5" min="4" max="16" value="8"></div>
+            <div class="field"><label for="f-lw">Line width (pt)</label>
+              <input type="number" id="f-lw" step="0.1" min="0.3" max="4" value="1.4"></div>
+            <div class="field"><label for="f-alw">Axis width (pt)</label>
+              <input type="number" id="f-alw" step="0.1" min="0.4" max="3" value="0.9"></div>
+          </div>
+        </div>
+
+        <div class="figgroup">
+          <span class="lbl">Axes and ticks</span>
+          <div class="figctl" style="margin-bottom:10px">
+            <div class="field"><label for="f-xt">x major tick (eV)</label>
+              <input type="number" id="f-xt" step="0.05" min="0.01" value="0.2"></div>
+            <div class="field"><label for="f-yt">y major tick (eV)</label>
+              <input type="number" id="f-yt" step="0.1" min="0.01" value="1"></div>
+            <div class="field"><label for="f-mn">minor per major</label>
+              <input type="number" id="f-mn" step="1" min="1" max="10" value="2"></div>
+            <div class="field"><label for="f-ymin">y min (eV)</label>
+              <input type="number" id="f-ymin" step="0.1" value="0"></div>
+            <div class="field"><label for="f-ymax">y max (eV)</label>
+              <input type="number" id="f-ymax" step="0.1" value="4"></div>
+          </div>
+          <div class="figctl" style="margin-bottom:10px">
+            <div class="field"><label for="f-tickpad">tick label gap (pt)</label>
+              <input type="number" id="f-tickpad" step="0.5" min="0" max="20" value="2"></div>
+            <div class="field"><label for="f-xpad">x title gap (pt)</label>
+              <input type="number" id="f-xpad" step="0.5" min="0" max="30" value="2"></div>
+            <div class="field"><label for="f-ypad">y title gap (pt)</label>
+              <input type="number" id="f-ypad" step="0.5" min="0" max="30" value="2"></div>
+            <div class="field"><label for="f-pgap">panel gap (pt)</label>
+              <input type="number" id="f-pgap" step="1" min="0" max="60" value="8"></div>
+            <div class="field" style="justify-content:flex-end">
+              <button class="btn sm" id="f-tight" type="button">Tighten spacing</button></div>
+          </div>
+          <div class="row2" style="margin-bottom:10px">
+            <div class="field"><label for="f-xtitle">x axis title</label>
+              <input type="text" id="f-xtitle" value="E_F − E_{VBM} (eV)"></div>
+            <div class="field"><label for="f-ytitle">y axis title</label>
+              <input type="text" id="f-ytitle" value="Formation energy (eV)"></div>
+          </div>
+          <div class="togwrap">
+            <label class="toggle"><input type="checkbox" id="f-autotick" checked> auto ticks</label>
+            <label class="toggle"><input type="checkbox" id="f-yauto" checked> auto y range</label>
+            <label class="toggle"><input type="checkbox" id="f-frame" checked> boxed frame, mirrored ticks</label>
+            <label class="toggle"><input type="checkbox" id="f-gray"> grayscale (dashed)</label>
+            <label class="toggle"><input type="checkbox" id="f-mk" checked> mark transition levels</label>
+            <label class="toggle"><input type="checkbox" id="f-cl" checked> charge labels</label>
+            <label class="toggle"><input type="checkbox" id="f-letters" checked> panel letters</label>
+            <label class="toggle"><input type="checkbox" id="f-white" checked> white background</label>
+            <span class="flexline"><span class="lbl">series labels</span>
+              <select id="f-lm" style="width:auto">
+                <option value="end">at line ends</option>
+                <option value="legend">legend</option>
+                <option value="none">none</option>
+              </select></span>
+          </div>
+          <div class="note" style="margin-top:10px">Subscripts follow LaTeX-ish notation:
+            <code>V_Cu</code> and <code>E_{VBM}</code> both render as subscripts, <code>^{2+}</code> as a superscript.</div>
+        </div>
+
+        <div class="figgroup">
+          <span class="lbl">Series</span>
+          <div class="tbl-wrap"><table class="dtbl"><tbody id="fig-series"></tbody></table></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Charge transition levels</h2>
+        <span class="hint">at the selected Δμ</span>
+        <div class="spacer"></div>
+        <button class="btn sm" id="b-tsv">Copy table</button>
+      </div>
+      <div class="panel-body">
+        <div class="tbl-wrap"><table id="tbl-lv">
+          <thead><tr>
+            <th>Defect</th><th>Transition</th>
+            <th class="num"><span class="nt">ε</span> (eV above VBM)</th>
+            <th class="num"><span class="nt">ε</span> (eV below CBM)</th>
+            <th class="num">E<sup>f</sup> at <span class="nt">ε</span> (eV)</th>
+            <th>Character</th>
+          </tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Formation energies at the band edges</h2>
+        <span class="hint">lowest charge state</span></div>
+      <div class="panel-body tbl-wrap">
+        <table id="tbl-edge">
+          <thead><tr>
+            <th>Defect</th>
+            <th class="num">E<sup>f</sup> at VBM</th><th>q</th>
+            <th class="num">E<sup>f</sup> at CBM</th><th>q</th>
+            <th class="num">min E<sup>f</sup> in gap</th>
+            <th class="num">charge states</th>
+          </tr></thead><tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================ constants */
+const SERIES = ["--s1","--s2","--s3","--s4","--s5","--s6","--s7","--s8"];
+const DASH   = ["", "6 3", "2 3", "9 3 2 3"];   // composite encoding past 8 defects
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ============================================================ demo data */
+const DEMO = {
+  host:"CuInSe2", dHf:-2.37, bulk:-1123.4567, vbm:2.1543, gap:1.04,
+  muRef:{Cu:-3.72, In:-2.55, Se:-3.48},
+  defects:
+`defect,charge,E_tot,E_corr,Cu,In,Se
+V_Cu,0,-1119.0167,0.00,-1,0,0
+V_Cu,-1,-1116.9424,0.11,-1,0,0
+Cu_In,0,-1121.8867,0.00,1,-1,0
+Cu_In,-1,-1119.5524,0.11,1,-1,0
+Cu_In,-2,-1117.1481,0.44,1,-1,0
+In_Cu,2,-1126.4253,0.44,-1,1,0
+In_Cu,1,-1123.6910,0.11,-1,1,0
+In_Cu,0,-1121.0867,0.00,-1,1,0
+V_Se,2,-1121.8853,0.44,0,0,-1
+V_Se,1,-1118.6510,0.11,0,0,-1
+V_Se,0,-1116.0367,0.00,0,0,-1
+Cu_i,1,-1127.6410,0.11,1,0,0
+Cu_i,0,-1125.1767,0.00,1,0,0`,
+  phases:
+`phase,dHf
+Cu2Se,-0.54
+CuSe,-0.41
+In2Se3,-2.99
+CuIn5Se8,-8.98`
+};
+
+/* ============================================================ state */
+const S = {
+  elements:[], hostCoeff:{}, hostDHf:0, bulk:0, vbm:0, gap:1,
+  muRef:{}, defects:[], phases:[], dmu:{}, verts:[], pivot:0,
+  axX:null, axY:null, selVtx:0, hidden:new Set(),
+  showAll:false, showLbl:true, errors:[]
+};
+
+/* ============================================================ parsing */
+function parseFormula(str){
+  const s = String(str).trim();
+  let i = 0;
+  function num(){
+    let d = "";
+    while(i < s.length && /[0-9.]/.test(s[i])) d += s[i++];
+    return d === "" ? 1 : parseFloat(d);
+  }
+  function group(){
+    const out = {};
+    while(i < s.length){
+      const c = s[i];
+      if(c === "(" || c === "[" ){
+        i++;
+        const inner = group();
+        if(s[i] === ")" || s[i] === "]") i++;
+        const m = num();
+        for(const k in inner) out[k] = (out[k]||0) + inner[k]*m;
+      } else if(c === ")" || c === "]"){
+        break;
+      } else if(/[A-Z]/.test(c)){
+        let el = s[i++];
+        while(i < s.length && /[a-z]/.test(s[i])) el += s[i++];
+        out[el] = (out[el]||0) + num();
+      } else { i++; }
+    }
+    return out;
+  }
+  const r = group();
+  return Object.keys(r).length ? r : null;
+}
+
+function parseTable(text){
+  const lines = String(text).split(/\r?\n/)
+    .map(l => l.trim()).filter(l => l && !l.startsWith("#"));
+  if(!lines.length) return {head:[], rows:[]};
+  const sep = lines[0].includes("\t") ? "\t" : ",";
+  const cut = l => l.split(sep).map(c => c.trim().replace(/^["']|["']$/g,""));
+  const head = cut(lines[0]).map(h => h.toLowerCase());
+  const rows = lines.slice(1).map(cut);
+  return {head, rows, rawHead:cut(lines[0])};
+}
+
+const numOr = (v, d) => { const x = parseFloat(v); return Number.isFinite(x) ? x : d; };
+
+function loadDefects(text, elements){
+  const {head, rows, rawHead} = parseTable(text);
+  const iName = head.findIndex(h => ["defect","name","label"].includes(h));
+  const iQ    = head.findIndex(h => ["charge","q"].includes(h));
+  const iE    = head.findIndex(h => ["e_tot","etot","energy","e"].includes(h));
+  const iC    = head.findIndex(h => ["e_corr","ecorr","correction","corr"].includes(h));
+  const errs = [];
+  if(iName < 0) errs.push("no 'defect' column");
+  if(iQ < 0) errs.push("no 'charge' column");
+  if(iE < 0) errs.push("no 'E_tot' column");
+  const elCol = {};
+  for(const el of elements){
+    const j = rawHead.findIndex(h => h === el);
+    if(j >= 0) elCol[el] = j;
+  }
+  if(errs.length) return {list:[], errs};
+  const list = [];
+  rows.forEach((r, n) => {
+    const nm = r[iName];
+    if(!nm) return;
+    const q = numOr(r[iQ], NaN);
+    const E = numOr(r[iE], NaN);
+    if(!Number.isFinite(q) || !Number.isFinite(E)){
+      errs.push(`row ${n+2}: bad charge or energy`); return;
+    }
+    const dn = {};
+    for(const el of elements) dn[el] = elCol[el] !== undefined ? numOr(r[elCol[el]], 0) : 0;
+    list.push({name:nm, q, Etot:E, Ecorr: iC >= 0 ? numOr(r[iC], 0) : 0, dn});
+  });
+  return {list, errs};
+}
+
+function loadPhases(text, elements){
+  const {head, rows, rawHead} = parseTable(text);
+  const iName = head.findIndex(h => ["phase","formula","name","compound"].includes(h));
+  const iH    = head.findIndex(h => ["dhf","d_hf","hf","enthalpy","e_f","dh"].includes(h));
+  const errs = [];
+  if(iName < 0 || iH < 0) return {list:[], errs:["need 'phase' and 'dHf' columns"]};
+  const elCol = {};
+  for(const el of elements){
+    const j = rawHead.findIndex(h => h === el);
+    if(j >= 0) elCol[el] = j;
+  }
+  const hasCols = Object.keys(elCol).length > 0;
+  const list = [];
+  rows.forEach((r, n) => {
+    const nm = r[iName];
+    if(!nm) return;
+    const dHf = numOr(r[iH], NaN);
+    if(!Number.isFinite(dHf)){ errs.push(`row ${n+2}: bad dHf`); return; }
+    let comp = {};
+    if(hasCols){
+      for(const el of elements) comp[el] = elCol[el] !== undefined ? numOr(r[elCol[el]], 0) : 0;
+      if(Object.values(comp).every(v => v === 0)) comp = parseFormula(nm) || {};
+    } else {
+      comp = parseFormula(nm) || {};
+    }
+    const foreign = Object.keys(comp).filter(k => !elements.includes(k));
+    if(foreign.length){ errs.push(`${nm}: ignored (contains ${foreign.join(", ")})`); return; }
+    if(Object.values(comp).every(v => !v)){ errs.push(`${nm}: could not read composition`); return; }
+    list.push({name:nm, comp, dHf});
+  });
+  return {list, errs};
+}
+
+/* ============================================================ linear algebra */
+function solve(A, b){
+  const n = b.length;
+  const M = A.map((r, i) => [...r, b[i]]);
+  for(let c = 0; c < n; c++){
+    let p = c;
+    for(let r = c+1; r < n; r++) if(Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if(Math.abs(M[p][c]) < 1e-11) return null;
+    [M[c], M[p]] = [M[p], M[c]];
+    for(let r = 0; r < n; r++){
+      if(r === c) continue;
+      const f = M[r][c]/M[c][c];
+      if(!f) continue;
+      for(let k = c; k <= n; k++) M[r][k] -= f*M[c][k];
+    }
+  }
+  return M.map((r, i) => r[n]/r[i]);
+}
+function combos(n, k){
+  const out = [], cur = [];
+  (function rec(start){
+    if(cur.length === k){ out.push([...cur]); return; }
+    for(let i = start; i < n; i++){ cur.push(i); rec(i+1); cur.pop(); }
+  })(0);
+  return out;
+}
+
+/* ============================================================ stability region */
+function buildConstraints(){
+  const els = S.elements, N = els.length;
+  const c = els.map(e => S.hostCoeff[e] || 0);
+  let p = 0;
+  for(let i = 1; i < N; i++) if(Math.abs(c[i]) > Math.abs(c[p])) p = i;
+  S.pivot = p;
+  const free = els.map((_, i) => i).filter(i => i !== p);
+  const g0 = S.hostDHf / c[p];
+  const g  = free.map(i => -c[i]/c[p]);
+
+  const A = [], b = [], names = [];
+  const add = (full, rhs, nm) => {
+    const row = free.map((i, j) => full[i] + full[p]*g[j]);
+    A.push(row); b.push(rhs - full[p]*g0); names.push(nm);
+  };
+  els.forEach((e, i) => { const r = new Array(N).fill(0); r[i] = 1; add(r, 0, e+"(s)"); });
+  for(const ph of S.phases) add(els.map(e => ph.comp[e] || 0), ph.dHf, ph.name);
+  return {A, b, names, free, p, g0, g, d:N-1};
+}
+
+function computeVertices(){
+  const K = buildConstraints();
+  const {A, b, names, free, p, g0, g, d} = K;
+  S.K = K;
+  if(d <= 0){ S.verts = [{dmu:{[S.elements[0]]: g0}, act:["host"]}]; return; }
+  const raw = [];
+  for(const idx of combos(A.length, d)){
+    const x = solve(idx.map(i => A[i]), idx.map(i => b[i]));
+    if(!x || x.some(v => !Number.isFinite(v))) continue;
+    let ok = true;
+    for(let k = 0; k < A.length; k++){
+      let s = 0; for(let j = 0; j < d; j++) s += A[k][j]*x[j];
+      if(s > b[k] + 1e-7){ ok = false; break; }
+    }
+    if(!ok) continue;
+    const dmu = {};
+    free.forEach((i, j) => dmu[S.elements[i]] = x[j]);
+    dmu[S.elements[p]] = g0 + g.reduce((s, gj, j) => s + gj*x[j], 0);
+    const act = [];
+    for(let k = 0; k < A.length; k++){
+      let s = 0; for(let j = 0; j < d; j++) s += A[k][j]*x[j];
+      if(Math.abs(s - b[k]) < 1e-6) act.push(names[k]);
+    }
+    raw.push({dmu, act:act.sort()});
+  }
+  const uniq = [];
+  for(const v of raw){
+    if(!uniq.some(u => S.elements.every(e => Math.abs(u.dmu[e] - v.dmu[e]) < 1e-6))) uniq.push(v);
+  }
+  S.verts = uniq;
+  orderVertices();
+}
+
+function orderVertices(){
+  if(S.verts.length < 3 || !S.axX || !S.axY) return;
+  const pts = S.verts.map(v => [v.dmu[S.axX], v.dmu[S.axY]]);
+  const cx = pts.reduce((s, q) => s+q[0], 0)/pts.length;
+  const cy = pts.reduce((s, q) => s+q[1], 0)/pts.length;
+  S.verts.sort((a, b) =>
+    Math.atan2(a.dmu[S.axY]-cy, a.dmu[S.axX]-cx) -
+    Math.atan2(b.dmu[S.axY]-cy, b.dmu[S.axX]-cx));
+}
+
+function hull2(points){
+  const P = points.map(p => [...p]).sort((a, b) => a[0]-b[0] || a[1]-b[1]);
+  if(P.length < 3) return P;
+  const cr = (o,a,b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+  const lo = [];
+  for(const q of P){ while(lo.length >= 2 && cr(lo[lo.length-2], lo[lo.length-1], q) <= 0) lo.pop(); lo.push(q); }
+  const up = [];
+  for(let i = P.length-1; i >= 0; i--){ const q = P[i];
+    while(up.length >= 2 && cr(up[up.length-2], up[up.length-1], q) <= 0) up.pop(); up.push(q); }
+  lo.pop(); up.pop();
+  return lo.concat(up);
+}
+
+function feasibility(dmu){
+  const out = [];
+  for(const e of S.elements){
+    if(dmu[e] > 1e-6) out.push({name:e+"(s)", by:dmu[e]});
+  }
+  for(const ph of S.phases){
+    const s = S.elements.reduce((a, e) => a + (ph.comp[e]||0)*dmu[e], 0);
+    if(s > ph.dHf + 1e-6) out.push({name:ph.name, by:s - ph.dHf});
+  }
+  const hostSum = S.elements.reduce((a, e) => a + (S.hostCoeff[e]||0)*dmu[e], 0);
+  return {viol:out, hostResid: hostSum - S.hostDHf};
+}
+
+/* ============================================================ energetics */
+function ef(d, EF, dmu){
+  const M = dmu || S.dmu;
+  let e = d.Etot - S.bulk + d.Ecorr + d.q*(S.vbm + EF);
+  for(const el of S.elements) e -= (d.dn[el]||0)*((S.muRef[el]||0) + (M[el]||0));
+  return e;
+}
+function defectNames(){
+  const seen = [];
+  for(const d of S.defects) if(!seen.includes(d.name)) seen.push(d.name);
+  return seen;
+}
+function linesFor(name, dmu){
+  const best = new Map();                      // one line per charge: keep the lowest
+  for(const d of S.defects){
+    if(d.name !== name) continue;
+    const A = ef(d, 0, dmu);
+    if(!best.has(d.q) || A < best.get(d.q).A) best.set(d.q, {q:d.q, A});
+  }
+  return [...best.values()].sort((a, b) => b.q - a.q);
+}
+function envelope(ls, gap){
+  if(!ls.length) return {segs:[], levels:[]};
+  const bp = new Set([0, gap]);
+  for(let i = 0; i < ls.length; i++) for(let j = i+1; j < ls.length; j++){
+    if(ls[i].q === ls[j].q) continue;
+    const x = (ls[j].A - ls[i].A)/(ls[i].q - ls[j].q);
+    if(x > 1e-9 && x < gap - 1e-9) bp.add(x);
+  }
+  const xs = [...bp].sort((a, b) => a-b);
+  const segs = [];
+  for(let i = 0; i < xs.length-1; i++){
+    const mid = (xs[i] + xs[i+1])/2;
+    let bestL = ls[0], bestV = Infinity;
+    for(const l of ls){ const v = l.A + l.q*mid; if(v < bestV - 1e-12){ bestV = v; bestL = l; } }
+    const last = segs[segs.length-1];
+    if(last && last.q === bestL.q) last.x1 = xs[i+1];
+    else segs.push({q:bestL.q, A:bestL.A, x0:xs[i], x1:xs[i+1]});
+  }
+  const levels = [];
+  for(let i = 0; i < segs.length-1; i++){
+    const x = segs[i].x1;
+    levels.push({q1:segs[i].q, q2:segs[i+1].q, eps:x, ef:segs[i].A + segs[i].q*x});
+  }
+  return {segs, levels};
+}
+
+/* ============================================================ number helpers */
+const fx = (v, n=3) => (Number.isFinite(v) ? v.toFixed(n) : "—");
+const sgn = q => (q > 0 ? "+" : q < 0 ? "−" : "") + Math.abs(q);
+function niceTicks(lo, hi, want=6){
+  const span = hi - lo;
+  if(!(span > 0)) return [lo];
+  const raw = span/want, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw/mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10)*mag;
+  const out = [];
+  for(let t = Math.ceil(lo/step)*step; t <= hi + step*1e-9; t += step) out.push(+t.toFixed(10));
+  return out;
+}
+
+/* ============================================================ chart: stability region */
+function renderRegion(){
+  const svg = document.getElementById("svg-region");
+  const box = document.getElementById("cb-region");
+  const W = Math.max(280, box.clientWidth || 420);
+  const H = Math.max(240, Math.min(360, W*0.78));
+  const m = {t:14, r:16, b:40, l:52};
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const ink = css("--ink"), ink2 = css("--ink-2"), ink3 = css("--ink-3");
+  const grid = css("--grid"), line2 = css("--line-2"), acc = css("--accent");
+  const surf = css("--surface");
+
+  const pts = S.verts.map(v => [v.dmu[S.axX], v.dmu[S.axY]]);
+  const cur = [S.dmu[S.axX], S.dmu[S.axY]];
+  const allX = pts.map(p => p[0]).concat([cur[0], 0]);
+  const allY = pts.map(p => p[1]).concat([cur[1], 0]);
+  let x0 = Math.min(...allX), x1 = Math.max(...allX);
+  let y0 = Math.min(...allY), y1 = Math.max(...allY);
+  const padX = Math.max(0.08, (x1-x0)*0.14), padY = Math.max(0.08, (y1-y0)*0.14);
+  x0 -= padX; x1 += padX; y0 -= padY; y1 += padY;
+  const SX = v => m.l + (v - x0)/(x1 - x0)*iw;
+  const SY = v => m.t + ih - (v - y0)/(y1 - y0)*ih;
+
+  let g = "";
+  const xt = niceTicks(x0, x1, 5), yt = niceTicks(y0, y1, 5);
+  for(const t of xt) g += `<line x1="${SX(t)}" y1="${m.t}" x2="${SX(t)}" y2="${m.t+ih}" stroke="${grid}" stroke-width="1"/>`;
+  for(const t of yt) g += `<line x1="${m.l}" y1="${SY(t)}" x2="${m.l+iw}" y2="${SY(t)}" stroke="${grid}" stroke-width="1"/>`;
+  for(const t of xt) g += `<text x="${SX(t)}" y="${m.t+ih+15}" fill="${ink3}" font-size="10" font-family="${css('--mono')||'monospace'}" text-anchor="middle">${t}</text>`;
+  for(const t of yt) g += `<text x="${m.l-7}" y="${SY(t)+3.5}" fill="${ink3}" font-size="10" font-family="monospace" text-anchor="end">${t}</text>`;
+  g += `<line x1="${m.l}" y1="${m.t+ih}" x2="${m.l+iw}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
+  g += `<line x1="${m.l}" y1="${m.t}" x2="${m.l}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
+  g += `<text x="${m.l+iw/2}" y="${H-6}" fill="${ink2}" font-size="11" text-anchor="middle">Δμ(${S.axX}) — eV</text>`;
+  g += `<text transform="translate(12,${m.t+ih/2}) rotate(-90)" fill="${ink2}" font-size="11" text-anchor="middle">Δμ(${S.axY}) — eV</text>`;
+
+  if(pts.length >= 3){
+    const h = hull2(pts);
+    const dstr = h.map(p => `${SX(p[0])},${SY(p[1])}`).join(" ");
+    g += `<polygon points="${dstr}" fill="${acc}" fill-opacity="0.13" stroke="${acc}" stroke-width="2" stroke-linejoin="round"/>`;
+  } else if(pts.length === 2){
+    g += `<line x1="${SX(pts[0][0])}" y1="${SY(pts[0][1])}" x2="${SX(pts[1][0])}" y2="${SY(pts[1][1])}" stroke="${acc}" stroke-width="3" stroke-linecap="round"/>`;
+  }
+
+  pts.forEach((p, i) => {
+    const sel = i === S.selVtx;
+    g += `<circle class="vdot" data-i="${i}" cx="${SX(p[0])}" cy="${SY(p[1])}" r="${sel?6:4.5}"
+           fill="${sel?acc:surf}" stroke="${acc}" stroke-width="2" style="cursor:pointer"/>`;
+    g += `<text x="${SX(p[0])+9}" y="${SY(p[1])-7}" fill="${ink}" font-size="10.5" font-weight="600" font-family="monospace">${String.fromCharCode(65+i)}</text>`;
+  });
+
+  // current condition crosshair (when it is not exactly a vertex)
+  const onV = pts.some(p => Math.abs(p[0]-cur[0]) < 1e-9 && Math.abs(p[1]-cur[1]) < 1e-9);
+  if(!onV){
+    g += `<line x1="${SX(cur[0])-7}" y1="${SY(cur[1])}" x2="${SX(cur[0])+7}" y2="${SY(cur[1])}" stroke="${ink}" stroke-width="1.5"/>`;
+    g += `<line x1="${SX(cur[0])}" y1="${SY(cur[1])-7}" x2="${SX(cur[0])}" y2="${SY(cur[1])+7}" stroke="${ink}" stroke-width="1.5"/>`;
+  }
+  svg.innerHTML = g;
+
+  const tip = document.getElementById("tip-region");
+  svg.querySelectorAll(".vdot").forEach(el => {
+    el.addEventListener("click", () => { pickVertex(+el.dataset.i); });
+    el.addEventListener("mouseenter", () => {
+      const i = +el.dataset.i, v = S.verts[i];
+      tip.innerHTML = `<div class="th">Vertex ${String.fromCharCode(65+i)} — ${v.act.join(" + ")}</div>` +
+        S.elements.map(e => `<div class="tr"><span class="nm">Δμ(${e})</span><span>${fx(v.dmu[e])}</span></div>`).join("");
+      tip.style.left = SX(pts[i][0]) + "px";
+      tip.style.top = (SY(pts[i][1]) - 10) + "px";
+      tip.classList.add("on");
+    });
+    el.addEventListener("mouseleave", () => tip.classList.remove("on"));
+  });
+}
+
+/* ============================================================ chart: main diagram */
+let MAINGEO = null;
+function renderMain(){
+  const svg = document.getElementById("svg-main");
+  const box = document.getElementById("cb-main");
+  const W = Math.max(300, box.clientWidth || 860);
+  const narrow = W < 560;
+  const H = Math.max(320, Math.min(560, W*(narrow ? 0.85 : 0.56)));
+  const labelRoom = S.showLbl && !narrow ? 86 : 16;
+  const m = {t:18, r:labelRoom, b:46, l:56};
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const ink = css("--ink"), ink2 = css("--ink-2"), ink3 = css("--ink-3");
+  const grid = css("--grid"), line2 = css("--line-2"), surf = css("--surface");
+  const gap = S.gap;
+
+  const names = defectNames().filter(n => !S.hidden.has(n));
+  const data = names.map((n, i) => {
+    const ls = linesFor(n);
+    const {segs, levels} = envelope(ls, gap);
+    return {name:n, ls, segs, levels,
+            color: css(SERIES[i % 8]), dash: DASH[Math.floor(i/8) % 4]};
+  });
+
+  // y range from the envelopes (plus all-charge lines when shown)
+  let lo = Infinity, hi = -Infinity;
+  for(const d of data){
+    for(const s of d.segs){
+      lo = Math.min(lo, s.A + s.q*s.x0, s.A + s.q*s.x1);
+      hi = Math.max(hi, s.A + s.q*s.x0, s.A + s.q*s.x1);
+    }
+    if(S.showAll) for(const l of d.ls){
+      lo = Math.min(lo, l.A, l.A + l.q*gap);
+      hi = Math.max(hi, l.A, l.A + l.q*gap);
+    }
+  }
+  if(!Number.isFinite(lo)){ lo = 0; hi = 1; }
+  const pad = Math.max(0.15, (hi-lo)*0.10);
+  hi = hi + pad;
+  lo = (lo >= 0 && lo < 1.0) ? 0 : lo - pad;   // anchor at zero only when it is close
+
+  const SX = v => m.l + v/gap*iw;
+  const SY = v => m.t + ih - (v - lo)/(hi - lo)*ih;
+  MAINGEO = {SX, SY, m, iw, ih, lo, hi, data, gap, W, H};
+
+  let g = "";
+  const yt = niceTicks(lo, hi, narrow ? 5 : 7);
+  const xt = niceTicks(0, gap, narrow ? 4 : 6).filter(t => t >= -1e-9 && t <= gap + 1e-9);
+  for(const t of yt) g += `<line x1="${m.l}" y1="${SY(t)}" x2="${m.l+iw}" y2="${SY(t)}" stroke="${grid}" stroke-width="1"/>`;
+  for(const t of xt) g += `<line x1="${SX(t)}" y1="${m.t}" x2="${SX(t)}" y2="${m.t+ih}" stroke="${grid}" stroke-width="1"/>`;
+  if(lo < 0 && hi > 0) g += `<line x1="${m.l}" y1="${SY(0)}" x2="${m.l+iw}" y2="${SY(0)}" stroke="${line2}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+
+  // band edges
+  g += `<line x1="${SX(0)}" y1="${m.t}" x2="${SX(0)}" y2="${m.t+ih}" stroke="${ink3}" stroke-width="1.5"/>`;
+  g += `<line x1="${SX(gap)}" y1="${m.t}" x2="${SX(gap)}" y2="${m.t+ih}" stroke="${ink3}" stroke-width="1.5"/>`;
+  g += `<text x="${SX(0)+5}" y="${m.t+11}" fill="${ink3}" font-size="10" font-family="monospace" letter-spacing="0.5">VBM</text>`;
+  g += `<text x="${SX(gap)-5}" y="${m.t+11}" fill="${ink3}" font-size="10" font-family="monospace" letter-spacing="0.5" text-anchor="end">CBM</text>`;
+
+  for(const t of yt) g += `<text x="${m.l-8}" y="${SY(t)+3.5}" fill="${ink3}" font-size="10.5" font-family="monospace" text-anchor="end">${t}</text>`;
+  for(const t of xt) g += `<text x="${SX(t)}" y="${m.t+ih+16}" fill="${ink3}" font-size="10.5" font-family="monospace" text-anchor="middle">${t}</text>`;
+  g += `<line x1="${m.l}" y1="${m.t+ih}" x2="${m.l+iw}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
+  g += `<line x1="${m.l}" y1="${m.t}" x2="${m.l}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
+  g += `<text x="${m.l+iw/2}" y="${H-8}" fill="${ink2}" font-size="11.5" text-anchor="middle">Fermi level above VBM — eV</text>`;
+  g += `<text transform="translate(13,${m.t+ih/2}) rotate(-90)" fill="${ink2}" font-size="11.5" text-anchor="middle">Formation energy — eV</text>`;
+
+  // faint all-charge-state lines behind the envelopes
+  if(S.showAll){
+    for(const d of data) for(const l of d.ls){
+      g += `<line x1="${SX(0)}" y1="${SY(l.A)}" x2="${SX(gap)}" y2="${SY(l.A + l.q*gap)}"
+             stroke="${d.color}" stroke-width="1" stroke-opacity="0.34" stroke-dasharray="3 3"/>`;
+    }
+  }
+
+  // envelopes
+  for(const d of data){
+    const pts = [];
+    d.segs.forEach((s, i) => {
+      if(i === 0) pts.push([SX(s.x0), SY(s.A + s.q*s.x0)]);
+      pts.push([SX(s.x1), SY(s.A + s.q*s.x1)]);
+    });
+    if(pts.length){
+      g += `<polyline points="${pts.map(p => p.join(",")).join(" ")}" fill="none"
+             stroke="${d.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+             ${d.dash ? `stroke-dasharray="${d.dash}"` : ""}/>`;
+    }
+    // transition-level markers: 2px surface ring
+    for(const lv of d.levels){
+      g += `<circle cx="${SX(lv.eps)}" cy="${SY(lv.ef)}" r="3.6" fill="${d.color}" stroke="${surf}" stroke-width="2"/>`;
+    }
+    // charge annotation on wide segments
+    if(S.showLbl) for(const s of d.segs){
+      const w = SX(s.x1) - SX(s.x0);
+      if(w < 42) continue;
+      const xm = (s.x0 + s.x1)/2;
+      const y = SY(s.A + s.q*xm);
+      g += `<text x="${SX(xm)}" y="${y - 7}" fill="${d.color}" font-size="10" font-weight="600"
+             font-family="monospace" text-anchor="middle"
+             paint-order="stroke" stroke="${surf}" stroke-width="3"
+             stroke-linejoin="round">${sgn(s.q)}</text>`;
+    }
+  }
+
+  // right-edge direct labels (relief for the contrast WARN on some hues)
+  if(S.showLbl && !narrow){
+    const lab = data.filter(d => d.segs.length).map(d => {
+      const s = d.segs[d.segs.length-1];
+      return {name:d.name, color:d.color, y:SY(s.A + s.q*s.x1)};
+    }).sort((a, b) => a.y - b.y);
+    const MIN = 13;
+    for(let i = 1; i < lab.length; i++)
+      if(lab[i].y - lab[i-1].y < MIN) lab[i].y = lab[i-1].y + MIN;
+    if(lab.length){
+      const over = lab[lab.length-1].y - (m.t + ih);
+      if(over > 0) for(const L of lab) L.y -= over;
+      if(lab[0].y < m.t + 6) { const up = m.t + 6 - lab[0].y; for(const L of lab) L.y += up; }
+    }
+    for(const L of lab){
+      g += `<line x1="${m.l+iw+2}" y1="${L.y}" x2="${m.l+iw+8}" y2="${L.y}" stroke="${L.color}" stroke-width="2"/>`;
+      g += `<text x="${m.l+iw+11}" y="${L.y+3.5}" fill="${ink}" font-size="10.5" font-family="monospace">${esc(L.name)}</text>`;
+    }
+  }
+
+  g += `<rect id="hitzone" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" style="cursor:crosshair"/>`;
+  g += `<line id="cross" x1="0" y1="${m.t}" x2="0" y2="${m.t+ih}" stroke="${ink3}" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>`;
+  svg.innerHTML = g;
+  wireMainHover();
+}
+
+function wireMainHover(){
+  const svg = document.getElementById("svg-main");
+  const box = document.getElementById("cb-main");
+  const tip = document.getElementById("tip-main");
+  const cross = svg.querySelector("#cross");
+  const zone = svg.querySelector("#hitzone");
+  if(!zone || !MAINGEO) return;
+  const {SX, SY, m, iw, ih, gap, data, W} = MAINGEO;
+
+  function move(ev){
+    const r = box.getBoundingClientRect();
+    const scale = (W || r.width)/r.width;
+    const px = (ev.clientX - r.left)*scale;
+    let EF = (px - m.l)/iw*gap;
+    EF = Math.max(0, Math.min(gap, EF));
+    cross.setAttribute("x1", SX(EF)); cross.setAttribute("x2", SX(EF));
+    cross.setAttribute("opacity", "1");
+    const rows = data.map(d => {
+      let best = null;
+      for(const l of d.ls){ const v = l.A + l.q*EF; if(!best || v < best.v) best = {v, q:l.q}; }
+      return best ? {name:d.name, color:d.color, ...best} : null;
+    }).filter(Boolean).sort((a, b) => a.v - b.v);
+    tip.innerHTML = `<div class="th">E<sub>F</sub> = ${fx(EF)} eV above VBM</div>` +
+      rows.map(r => `<div class="tr"><span class="nm"><span class="dot" style="background:${r.color}"></span>${esc(r.name)}<sup style="color:var(--ink-3)">${sgn(r.q)}</sup></span><span>${fx(r.v)}</span></div>`).join("");
+    const cx = SX(EF)/scale, cy = (m.t + 8)/scale;
+    tip.style.left = Math.max(80, Math.min(r.width - 80, cx)) + "px";
+    tip.style.top = Math.max(0, cy) + "px";
+    tip.style.transform = "translate(-50%, 0)";
+    tip.classList.add("on");
+  }
+  zone.addEventListener("mousemove", move);
+  zone.addEventListener("mouseleave", () => { tip.classList.remove("on"); cross.setAttribute("opacity","0"); });
+  zone.addEventListener("touchmove", e => { if(e.touches[0]) move(e.touches[0]); }, {passive:true});
+}
+
+/* ============================================================ DOM helpers */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const $ = id => document.getElementById(id);
+
+/* ============================================================ panels */
+function renderChips(){
+  const n = defectNames().length;
+  const cond = S.verts[S.selVtx];
+  $("chips").innerHTML = [
+    `<span class="chip">host <b>${esc(S.hostFormula)}</b></span>`,
+    `<span class="chip">gap <b>${fx(S.gap,2)} eV</b></span>`,
+    `<span class="chip">${n} defect${n===1?"":"s"} · <b>${S.defects.length}</b> entries</span>`,
+    `<span class="chip">Δμ <b>${S.elements.map(e => `${e} ${fx(S.dmu[e],2)}`).join(" · ")}</b></span>`
+  ].join("");
+  $("cond-tag").textContent = cond
+    ? `vertex ${String.fromCharCode(65+S.selVtx)} — ${cond.act.join(" + ")}`
+    : "custom Δμ";
+  $("tag-host").textContent = S.elements.join(" ");
+  $("tag-def").textContent = `${S.defects.length} rows`;
+  $("tag-ph").textContent = `${S.phases.length} phases`;
+  $("region-dim").textContent = S.elements.length <= 2
+    ? "1-D line segment"
+    : S.elements.length === 3 ? "2-D polygon"
+    : `${S.elements.length-1}-D polytope — shown projected`;
+}
+
+function renderVertexList(){
+  const box = $("vtx-list");
+  if(!S.verts.length){ box.innerHTML = `<div class="note bad">No stable region — the host is unstable against the phases given.</div>`; return; }
+  box.innerHTML = S.verts.map((v, i) => `
+    <button class="vtx-btn ${i===S.selVtx?"sel":""}" data-i="${i}">
+      <span class="id">${String.fromCharCode(65+i)}</span>
+      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(v.act.join(" + "))}</span>
+    </button>`).join("");
+  box.querySelectorAll(".vtx-btn").forEach(b =>
+    b.addEventListener("click", () => pickVertex(+b.dataset.i)));
+}
+
+function renderDmuInputs(){
+  const p = S.elements[S.pivot];
+  $("dmu-inputs").innerHTML = S.elements.map(e => `
+    <div class="flexline" style="gap:8px">
+      <span class="lbl" style="width:56px">Δμ(${e})</span>
+      <input type="number" step="0.01" id="dmu-${e}" value="${S.dmu[e].toFixed(4)}"
+        ${e===p?"disabled":""} style="flex:1" aria-label="Delta mu ${e}">
+      ${e===p?`<span class="muted mono" style="font-size:10px">solved</span>`:""}
+    </div>`).join("");
+  for(const e of S.elements){
+    if(e === p) continue;
+    $("dmu-"+e).addEventListener("change", () => {
+      const v = parseFloat($("dmu-"+e).value);
+      if(!Number.isFinite(v)) return;
+      S.dmu[e] = v;
+      // re-solve the pivot from the host equality
+      let s = 0;
+      for(const k of S.elements) if(k !== p) s += (S.hostCoeff[k]||0)*S.dmu[k];
+      S.dmu[p] = (S.hostDHf - s)/(S.hostCoeff[p]||1);
+      S.selVtx = S.verts.findIndex(vv => S.elements.every(k => Math.abs(vv.dmu[k]-S.dmu[k]) < 1e-6));
+      draw();
+    });
+  }
+}
+
+function renderFeas(){
+  const {viol, hostResid} = feasibility(S.dmu);
+  let h = "";
+  if(Math.abs(hostResid) > 1e-6)
+    h += `<div class="note bad">Off the host line by ${fx(hostResid)} eV — Δμ does not satisfy the ${esc(S.hostFormula)} equality.</div>`;
+  else if(viol.length)
+    h += `<div class="note warn"><b>Outside the stability region.</b><br>` +
+         viol.map(v => `${esc(v.name)} would precipitate — exceeded by ${fx(v.by)} eV`).join("<br>") + `</div>`;
+  else
+    h += `<div class="note">Inside the stability region; ${esc(S.hostFormula)} is the equilibrium phase here.</div>`;
+  $("feas").innerHTML = h;
+}
+
+function renderLegend(){
+  const names = defectNames();
+  $("legend").innerHTML = names.map((n, i) => {
+    const off = S.hidden.has(n);
+    return `<button class="lg ${off?"off":""}" data-n="${esc(n)}" aria-pressed="${!off}">
+      <span class="dot" style="background:${css(SERIES[i%8])}"></span>${esc(n)}</button>`;
+  }).join("") || `<span class="muted">No defect entries loaded.</span>`;
+  $("legend").querySelectorAll(".lg").forEach(b => b.addEventListener("click", () => {
+    const n = b.dataset.n;
+    S.hidden.has(n) ? S.hidden.delete(n) : S.hidden.add(n);
+    draw();
+  }));
+}
+
+function renderTables(){
+  const names = defectNames();
+  const lv = $("tbl-lv").querySelector("tbody");
+  const ed = $("tbl-edge").querySelector("tbody");
+  let a = "", b = "";
+  names.forEach((n, i) => {
+    const col = css(SERIES[i%8]);
+    const ls = linesFor(n);
+    const {segs, levels} = envelope(ls, S.gap);
+    const dim = S.hidden.has(n) ? ' style="opacity:.42"' : "";
+    for(const L of levels){
+      const kind = Math.abs(L.q1 - L.q2) > 1 ? "negative-U" :
+                   (L.eps < 0.1*S.gap || L.eps > 0.9*S.gap) ? "shallow" : "deep";
+      a += `<tr${dim}><td><span class="swatch" style="background:${col}"></span>${esc(n)}</td>
+        <td>ε(${sgn(L.q1)}/${sgn(L.q2)})</td>
+        <td class="num">${fx(L.eps)}</td><td class="num">${fx(S.gap - L.eps)}</td>
+        <td class="num">${fx(L.ef)}</td><td class="muted">${kind}</td></tr>`;
+    }
+    if(!levels.length && segs.length)
+      a += `<tr${dim}><td><span class="swatch" style="background:${col}"></span>${esc(n)}</td>
+        <td class="muted">none in gap</td><td class="num">—</td><td class="num">—</td>
+        <td class="num">—</td><td class="muted">q = ${sgn(segs[0].q)} throughout</td></tr>`;
+
+    if(segs.length){
+      const f0 = segs[0], fL = segs[segs.length-1];
+      const eV = f0.A + f0.q*0, eC = fL.A + fL.q*S.gap;
+      let mn = Infinity;
+      for(const s of segs) mn = Math.min(mn, s.A + s.q*s.x0, s.A + s.q*s.x1);
+      b += `<tr${dim}><td><span class="swatch" style="background:${col}"></span>${esc(n)}</td>
+        <td class="num">${fx(eV)}</td><td>${sgn(f0.q)}</td>
+        <td class="num">${fx(eC)}</td><td>${sgn(fL.q)}</td>
+        <td class="num">${fx(mn)}</td>
+        <td class="num muted">${ls.map(l => sgn(l.q)).join(" ")}</td></tr>`;
+    }
+  });
+  lv.innerHTML = a || `<tr><td colspan="6" class="muted">No entries.</td></tr>`;
+  ed.innerHTML = b || `<tr><td colspan="7" class="muted">No entries.</td></tr>`;
+}
+
+function renderMsgs(){
+  const m = [];
+  if(S.errors.length) m.push(`<div class="note warn">${S.errors.map(esc).join("<br>")}</div>`);
+  if(defectNames().length > 8)
+    m.push(`<div class="note">More than eight defects: hues repeat with a changed line style, so read the right-edge labels rather than color alone.</div>`);
+  $("main-msg").innerHTML = m.join("");
+}
+
+/* ============================================================ orchestration */
+function pickVertex(i){
+  if(!S.verts[i]) return;
+  S.selVtx = i;
+  for(const e of S.elements) S.dmu[e] = S.verts[i].dmu[e];
+  draw();
+}
+function draw(){
+  renderChips(); renderVertexList(); renderDmuInputs(); renderFeas();
+  renderLegend(); renderRegion(); renderMain(); renderTables(); renderMsgs();
+  renderCondRows(); renderSeriesRows(); renderFigure();
+}
+
+function readSystem(){
+  S.hostFormula = $("f-host").value.trim() || "AB";
+  const hc = parseFormula(S.hostFormula) || {A:1, B:1};
+  S.hostCoeff = hc;
+  const els = Object.keys(hc);
+  const changed = els.join() !== S.elements.join();
+  S.elements = els;
+  S.hostDHf = numOr($("f-dhf").value, -1);
+  S.bulk = numOr($("f-bulk").value, 0);
+  S.vbm  = numOr($("f-vbm").value, 0);
+  S.gap  = Math.max(0.05, numOr($("f-gap").value, 1));
+  if(changed){
+    for(const e of els) if(!(e in S.muRef)) S.muRef[e] = 0;
+    S.axX = els[0]; S.axY = els[1] || els[0];
+    buildMuRefGrid(); buildAxisSelects();
+  }
+  for(const e of els){
+    const inp = $("mu-"+e);
+    if(inp) S.muRef[e] = numOr(inp.value, 0);
+  }
+}
+function buildMuRefGrid(){
+  $("muref-grid").innerHTML = S.elements.map(e => `
+    <div class="field"><label for="mu-${e}">${e}</label>
+      <input type="number" step="0.0001" id="mu-${e}" value="${(S.muRef[e]||0).toFixed(4)}"></div>`).join("");
+  S.elements.forEach(e => $("mu-"+e).addEventListener("change", recompute));
+}
+function buildAxisSelects(){
+  for(const [id, key] of [["ax-x","axX"], ["ax-y","axY"]]){
+    const sel = $(id);
+    sel.innerHTML = S.elements.map(e => `<option value="${e}" ${S[key]===e?"selected":""}>${e}</option>`).join("");
+  }
+}
+
+function recompute(){
+  readSystem();
+  const dres = loadDefects($("ta-def").value, S.elements);
+  const pres = loadPhases($("ta-ph").value, S.elements);
+  S.defects = dres.list; S.phases = pres.list;
+  S.errors = [...dres.errs, ...pres.errs];
+  computeVertices();
+  if(!S.verts.length){
+    for(const e of S.elements) S.dmu[e] = 0;
+  } else {
+    if(S.selVtx >= S.verts.length) S.selVtx = 0;
+    const keep = S.elements.every(e => Number.isFinite(S.dmu[e]));
+    const stillV = keep && S.verts.findIndex(v => S.elements.every(e => Math.abs(v.dmu[e]-S.dmu[e]) < 1e-6));
+    if(!keep || stillV === -1 || stillV === false){
+      S.selVtx = Math.min(S.selVtx, S.verts.length-1);
+      for(const e of S.elements) S.dmu[e] = S.verts[S.selVtx].dmu[e];
+    } else S.selVtx = stillV;
+  }
+  draw();
+}
+
+function loadDemo(){
+  $("f-host").value = DEMO.host; $("f-dhf").value = DEMO.dHf;
+  $("f-bulk").value = DEMO.bulk; $("f-vbm").value = DEMO.vbm; $("f-gap").value = DEMO.gap;
+  S.muRef = {...DEMO.muRef}; S.elements = [];
+  $("ta-def").value = DEMO.defects; $("ta-ph").value = DEMO.phases;
+  S.hidden.clear(); S.selVtx = 0;
+  $("src-tag").textContent = "example data";
+  recompute();
+}
+
+/* ============================================================ wiring */
+["f-host","f-dhf","f-bulk","f-vbm","f-gap"].forEach(id =>
+  $(id).addEventListener("change", recompute));
+$("b-def").addEventListener("click", () => { $("src-tag").textContent = "your data"; recompute(); });
+$("b-ph").addEventListener("click",  () => { $("src-tag").textContent = "your data"; recompute(); });
+$("b-demo").addEventListener("click", loadDemo);
+$("t-all").addEventListener("change", e => { S.showAll = e.target.checked; renderMain(); });
+$("t-lbl").addEventListener("change", e => { S.showLbl = e.target.checked; renderMain(); });
+$("ax-x").addEventListener("change", e => { S.axX = e.target.value; orderVertices(); draw(); });
+$("ax-y").addEventListener("change", e => { S.axY = e.target.value; orderVertices(); draw(); });
+
+function wireUpload(inputId, taId){
+  $(inputId).addEventListener("change", ev => {
+    const f = ev.target.files && ev.target.files[0];
+    if(!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { $(taId).value = rd.result; $("src-tag").textContent = f.name; recompute(); };
+    rd.readAsText(f);
+  });
+}
+wireUpload("u-def", "ta-def");
+wireUpload("u-ph", "ta-ph");
+
+function flash(btn, txt){
+  const old = btn.textContent; btn.textContent = txt;
+  setTimeout(() => btn.textContent = old, 1400);
+}
+$("b-svg").addEventListener("click", async e => {
+  const svg = $("svg-main").outerHTML
+    .replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ');
+  try { await navigator.clipboard.writeText(svg); flash(e.target, "Copied"); }
+  catch { flash(e.target, "Copy blocked"); }
+});
+$("b-tsv").addEventListener("click", async e => {
+  const rows = [["defect","q1","q2","eps_above_VBM_eV","eps_below_CBM_eV","Ef_at_eps_eV"]];
+  for(const n of defectNames()){
+    for(const L of envelope(linesFor(n), S.gap).levels)
+      rows.push([n, L.q1, L.q2, L.eps.toFixed(4), (S.gap-L.eps).toFixed(4), L.ef.toFixed(4)]);
+  }
+  const head = `# ${S.hostFormula}  Delta-mu: ` +
+    S.elements.map(el => `${el}=${S.dmu[el].toFixed(4)}`).join(" ");
+  try { await navigator.clipboard.writeText(head + "\n" + rows.map(r => r.join("\t")).join("\n"));
+        flash(e.target, "Copied"); }
+  catch { flash(e.target, "Copy blocked"); }
+});
+
+/* ============================================================ publication figure */
+const FIGCOL = ["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#4a3aa7","#e34948"];
+const GRAYDASH = ["", "5 2.2", "1.6 1.8", "7 2 1.6 2", "3.2 1.8", "9 2.4 1.6 2.4 1.6 2.4"];
+
+S.fig = {
+  n:1, conds:[0,1,2], caps:["","",""],
+  width:3.3, height:2.7, font:"sans", fs:8, lw:1.4,
+  xTick:0.2, yTick:1, minor:2, autoTick:true,
+  yAuto:true, yMin:0, yMax:4,
+  tickPad:2, xPad:2, yPad:2, pGap:8, axisLW:0.9,
+  frame:true, gray:false, mk:true, cl:true, letters:true, white:true,
+  labelMode:"end",
+  xTitle:"E_F − E_{VBM} (eV)", yTitle:"Formation energy (eV)",
+  style:{}
+};
+
+function styleOf(nm){
+  const F = S.fig;
+  if(!F.style[nm]){
+    const i = defectNames().indexOf(nm);
+    F.style[nm] = {vis:true, color:FIGCOL[(i < 0 ? 0 : i) % 8], label:nm};
+  }
+  return F.style[nm];
+}
+function condDmu(i){
+  if(i === -1 || !S.verts[i]) return {...S.dmu};
+  return {...S.verts[i].dmu};
+}
+function autoCaption(i){
+  if(i === -1 || !S.verts[i]) return "";
+  return S.verts[i].act.join(" + ");
+}
+function autoStep(lo, hi, want){          // 1 / 2 / 5 decades only — no 2.5 steps
+  const span = Math.abs(hi - lo) || 1;
+  const raw = span/want, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw/mag;
+  return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10)*mag;
+}
+function decimalsFor(step){               // enough places to write the step exactly
+  for(let d = 0; d <= 4; d++) if(Math.abs(step - +step.toFixed(d)) < 1e-9) return d;
+  return 4;
+}
+const HALO = w => ` paint-order="stroke" stroke="#ffffff" stroke-width="${w.toFixed(2)}" stroke-linejoin="round"`;
+
+/* rich text: V_Cu, E_{VBM}, ^{2+} */
+function richParts(str){
+  const out = [];
+  let i = 0, buf = "";
+  const push = (t, k) => { if(t !== "") out.push({t, k}); };
+  while(i < str.length){
+    const c = str[i];
+    if(c === "_" || c === "^"){
+      push(buf, "n"); buf = "";
+      const k = c === "_" ? "sub" : "sup";
+      i++;
+      let tok = "";
+      if(str[i] === "{"){ i++; while(i < str.length && str[i] !== "}") tok += str[i++]; i++; }
+      else { while(i < str.length && /[A-Za-z0-9+\-−.]/.test(str[i])) tok += str[i++]; }
+      push(tok, k);
+    } else { buf += c; i++; }
+  }
+  push(buf, "n");
+  return out;
+}
+function richSVG(str, fs){
+  const parts = richParts(String(str));
+  let s = "", cur = 0;
+  for(const p of parts){
+    const want = p.k === "sub" ? fs*0.30 : p.k === "sup" ? -fs*0.36 : 0;
+    const sz = p.k === "n" ? fs : fs*0.72;
+    s += `<tspan dy="${(want-cur).toFixed(2)}" font-size="${sz.toFixed(2)}">${esc(p.t)}</tspan>`;
+    cur = want;
+  }
+  return s;
+}
+const richWidth = (str, fs) => richParts(String(str))
+  .reduce((w, p) => w + p.t.length*fs*(p.k === "n" ? 0.55 : 0.40), 0);
+
+function buildFigureSVG(){
+  const F = S.fig, n = F.n, fs = F.fs, lw = F.lw;
+  const W = F.width*72, H = F.height*72;
+  const fam = F.font === "serif"
+    ? "'Times New Roman', Times, serif"
+    : "Helvetica, Arial, sans-serif";
+  const names = defectNames().filter(nm => styleOf(nm).vis);
+
+  const panels = [];
+  for(let p = 0; p < n; p++){
+    const dmu = condDmu(F.conds[p]);
+    const series = names.map((nm, i) => {
+      const st = styleOf(nm);
+      const {segs, levels} = envelope(linesFor(nm, dmu), S.gap);
+      return {label: st.label || nm,
+              color: F.gray ? "#000000" : st.color,
+              dash: F.gray ? GRAYDASH[i % GRAYDASH.length] : "",
+              segs, levels};
+    });
+    panels.push({series, cap: F.caps[p] || autoCaption(F.conds[p])});
+  }
+
+  let lo = Infinity, hi = -Infinity;
+  for(const P of panels) for(const s of P.series) for(const g of s.segs){
+    lo = Math.min(lo, g.A + g.q*g.x0, g.A + g.q*g.x1);
+    hi = Math.max(hi, g.A + g.q*g.x0, g.A + g.q*g.x1);
+  }
+  if(!Number.isFinite(lo)){ lo = 0; hi = 1; }
+
+  const xStep = F.autoTick ? autoStep(0, S.gap, 6) : Math.max(1e-4, F.xTick);
+  let yStep   = F.autoTick ? autoStep(lo, hi, 6)  : Math.max(1e-4, F.yTick);
+  if(F.yAuto){
+    const pad = Math.max((hi-lo)*0.06, yStep*0.25);
+    lo = Math.floor((lo - pad)/yStep)*yStep;
+    hi = Math.ceil((hi + pad)/yStep)*yStep;
+    if(lo > -yStep*0.5 && lo < yStep*0.5) lo = 0;
+  } else { lo = F.yMin; hi = F.yMax; }
+  if(!(hi > lo)) hi = lo + 1;
+
+  const xd = decimalsFor(xStep), yd = decimalsFor(yStep);
+  const ticksFrom = (a, b, st) => {
+    const out = [];
+    for(let t = Math.ceil(a/st - 1e-9)*st; t <= b + st*1e-9; t += st) out.push(+t.toFixed(10));
+    return out;
+  };
+  const xMaj = ticksFrom(0, S.gap, xStep), yMaj = ticksFrom(lo, hi, yStep);
+  const xMin = F.minor > 1 ? ticksFrom(0, S.gap, xStep/F.minor) : [];
+  const yMinT = F.minor > 1 ? ticksFrom(lo, hi, yStep/F.minor) : [];
+
+  // margins built from explicit pads, so every gap is adjustable
+  const legendH = F.labelMode === "legend" ? fs*1.9 : 0;
+  const tp = Math.max(0, F.tickPad), xp = Math.max(0, F.xPad);
+  const yp = Math.max(0, F.yPad),    gp = Math.max(0, F.pGap);
+  const yLabW = yMaj.reduce((w, t) => Math.max(w, t.toFixed(yd).length), 1)*fs*0.56;
+  // A title's height depends on what it contains: a superscript reaches above the
+  // cap line, a subscript drops below the baseline. Measure the actual title rather
+  // than guessing, so nothing is clipped and a plain title does not waste margin.
+  const capOf  = s => fs*(/\^/.test(s) ? 1.10 : 0.98);   // 0.98 clears parentheses
+  const dropOf = s => fs*(/_/.test(s)  ? 0.56 : 0.32);
+  const xCap = capOf(F.xTitle), xDrop = dropOf(F.xTitle);
+  const yCap = capOf(F.yTitle), yDrop = dropOf(F.yTitle);
+  const digitH = fs*0.90;
+  const mL = tp + yLabW + yp + yCap + yDrop;
+  const mR = fs*0.9;
+  const mT = fs*0.9 + legendH;
+  const mB = tp + digitH + xp + xCap + xDrop;
+  const pw = (W - mL - mR - (n-1)*gp)/n;
+  const ph = H - mT - mB;
+  const tkMaj = fs*0.55, tkMin = fs*0.30;
+  const aw = Math.max(0.4, F.axisLW);       // frame and ticks, independent of the data lines
+  S.__geo = {mL, mR, mT, mB, pw, ph, gp, n, W, H, xMaj, yMaj, xMin, yMinT};
+  if(!(pw > fs*2) || !(ph > fs*2))
+    throw new Error("no room left for the plot — reduce the label gaps or increase the figure size");
+
+  const AX = "#000000";
+  let g = "";
+  if(F.white) g += `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff"/>`;
+
+  for(let p = 0; p < n; p++){
+    const X0 = mL + p*(pw + gp), Y0 = mT;
+    const SX = v => X0 + v/S.gap*pw;
+    const SY = v => Y0 + ph - (v - lo)/(hi - lo)*ph;
+    const P = panels[p];
+    const cid = `clip${p}`;
+    g += `<clipPath id="${cid}"><rect x="${X0}" y="${Y0}" width="${pw}" height="${ph}"/></clipPath>`;
+
+    g += `<g clip-path="url(#${cid})">`;
+    const placed = [];                     // charge-label collision guard
+    for(const s of P.series){
+      const pts = [];
+      s.segs.forEach((sg, i) => {
+        if(i === 0) pts.push([SX(sg.x0), SY(sg.A + sg.q*sg.x0)]);
+        pts.push([SX(sg.x1), SY(sg.A + sg.q*sg.x1)]);
+      });
+      if(pts.length > 1)
+        g += `<polyline points="${pts.map(q => q.map(v => v.toFixed(2)).join(",")).join(" ")}"
+               fill="none" stroke="${s.color}" stroke-width="${lw}" stroke-linejoin="round"
+               stroke-linecap="round"${s.dash ? ` stroke-dasharray="${s.dash}"` : ""}/>`;
+      if(F.mk) for(const L of s.levels)
+        g += `<circle cx="${SX(L.eps).toFixed(2)}" cy="${SY(L.ef).toFixed(2)}"
+               r="${Math.max(1.1, lw*1.25).toFixed(2)}" fill="${s.color}"/>`;
+      if(F.cl) for(const sg of s.segs){
+        if(SX(sg.x1) - SX(sg.x0) < fs*2.2) continue;
+        const xm = (sg.x0 + sg.x1)/2;
+        const tx = SX(xm), ty = SY(sg.A + sg.q*xm) - lw - fs*0.45;
+        if(placed.some(q => Math.abs(q[0]-tx) < fs*1.9 && Math.abs(q[1]-ty) < fs*1.05)) continue;
+        placed.push([tx, ty]);
+        g += `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}"
+               font-family="${fam}" font-size="${(fs*0.82).toFixed(2)}" fill="${s.color}"
+               text-anchor="middle"${HALO(fs*0.26)}>${esc(sgn(sg.q))}</text>`;
+      }
+    }
+    g += `</g>`;
+
+    // Frame and ticks are axis-aligned hairlines. They are collected into their
+    // own crispEdges group so the renderer snaps them to whole pixels — without
+    // that, each panel sits at a different sub-pixel offset and a thin tick can
+    // antialias to nothing in one panel while showing in the next.
+    let axg = "", txt = "";
+    const alw = aw.toFixed(2);
+    if(F.frame)
+      axg += `<rect x="${X0.toFixed(2)}" y="${Y0.toFixed(2)}" width="${pw.toFixed(2)}" height="${ph.toFixed(2)}" fill="none" stroke="${AX}" stroke-width="${alw}"/>`;
+    else {
+      axg += `<line x1="${X0.toFixed(2)}" y1="${(Y0+ph).toFixed(2)}" x2="${(X0+pw).toFixed(2)}" y2="${(Y0+ph).toFixed(2)}" stroke="${AX}" stroke-width="${alw}"/>`;
+      axg += `<line x1="${X0.toFixed(2)}" y1="${Y0.toFixed(2)}" x2="${X0.toFixed(2)}" y2="${(Y0+ph).toFixed(2)}" stroke="${AX}" stroke-width="${alw}"/>`;
+    }
+    const tick = (x1,y1,x2,y2) => `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${AX}" stroke-width="${alw}"/>`;
+    for(const t of xMin){ axg += tick(SX(t), Y0+ph, SX(t), Y0+ph-tkMin); if(F.frame) axg += tick(SX(t), Y0, SX(t), Y0+tkMin); }
+    for(const t of yMinT){ if(t < lo-1e-9 || t > hi+1e-9) continue;
+      axg += tick(X0, SY(t), X0+tkMin, SY(t)); if(F.frame) axg += tick(X0+pw, SY(t), X0+pw-tkMin, SY(t)); }
+    // Every tick keeps its label. Where panels sit close together the outermost
+    // labels would run into each other across the gap, so instead of dropping one
+    // they are anchored to the frame edge — the number stays, it just tucks inward.
+    const tight = n > 1 && gp < fs*1.9;
+    xMaj.forEach((t, k) => {
+      axg += tick(SX(t), Y0+ph, SX(t), Y0+ph-tkMaj); if(F.frame) axg += tick(SX(t), Y0, SX(t), Y0+tkMaj);
+      let anchor = "middle";
+      if(tight && k === xMaj.length-1 && p < n-1 && SX(t) > X0 + pw - fs*1.2) anchor = "end";
+      if(tight && k === 0 && p > 0 && SX(t) < X0 + fs*1.2) anchor = "start";
+      txt += `<text x="${SX(t).toFixed(2)}" y="${(Y0+ph+tp+digitH).toFixed(2)}" font-family="${fam}"
+             font-size="${fs}" fill="${AX}" text-anchor="${anchor}">${t.toFixed(xd)}</text>`;
+    });
+    for(const t of yMaj){
+      axg += tick(X0, SY(t), X0+tkMaj, SY(t)); if(F.frame) axg += tick(X0+pw, SY(t), X0+pw-tkMaj, SY(t));
+      if(p === 0) txt += `<text x="${(X0-tp).toFixed(2)}" y="${(SY(t)+fs*0.35).toFixed(2)}" font-family="${fam}"
+             font-size="${fs}" fill="${AX}" text-anchor="end">${t.toFixed(yd)}</text>`;
+    }
+    g += `<g shape-rendering="crispEdges">${axg}</g>${txt}`;
+
+    // panel letter + condition caption
+    const head = [];
+    if(F.letters && n > 1) head.push(`(${String.fromCharCode(97+p)})`);
+    if(P.cap) head.push(P.cap);
+    if(head.length)
+      g += `<text x="${(X0+fs*0.55).toFixed(2)}" y="${(Y0+fs*1.35).toFixed(2)}" font-family="${fam}"
+             font-size="${(fs*0.95).toFixed(2)}" fill="${AX}"${HALO(fs*0.30)}>${richSVG(head.join(" "), fs*0.95)}</text>`;
+
+    // line-end labels
+    if(F.labelMode === "end"){
+      const L = P.series.filter(s => s.segs.length).map(s => {
+        const sg = s.segs[s.segs.length-1];
+        return {t:s.label, c:s.color, y:SY(sg.A + sg.q*sg.x1)};
+      }).sort((a,b) => a.y - b.y);
+      const MIN = fs*1.32;
+      for(let i = 1; i < L.length; i++) if(L[i].y - L[i-1].y < MIN) L[i].y = L[i-1].y + MIN;
+      if(L.length){
+        const over = L[L.length-1].y - (Y0 + ph - fs*0.35);
+        if(over > 0) for(const q of L) q.y -= over;
+        const under = (Y0 + fs*1.0) - L[0].y;
+        if(under > 0) for(const q of L) q.y += under;
+      }
+      for(const q of L)
+        g += `<text x="${(X0+pw-fs*0.4).toFixed(2)}" y="${(q.y - fs*0.42).toFixed(2)}" font-family="${fam}"
+               font-size="${(fs*0.92).toFixed(2)}" fill="${q.c}" text-anchor="end"${HALO(fs*0.30)}>${richSVG(q.t, fs*0.92)}</text>`;
+    }
+  }
+
+  // shared legend
+  if(F.labelMode === "legend" && panels.length){
+    const ss = panels[0].series;
+    const seg = fs*1.8, padx = fs*0.5, gapx = fs*1.1;
+    let tot = 0;
+    for(const s of ss) tot += seg + padx + richWidth(s.label, fs*0.92) + gapx;
+    let x = Math.max(mL, (W - (tot - gapx))/2);
+    const y = mT - legendH + fs*1.0;
+    for(const s of ss){
+      g += `<line x1="${x.toFixed(2)}" y1="${y.toFixed(2)}" x2="${(x+seg).toFixed(2)}" y2="${y.toFixed(2)}"
+             stroke="${s.color}" stroke-width="${lw}" stroke-linecap="round"${s.dash ? ` stroke-dasharray="${s.dash}"` : ""}/>`;
+      x += seg + padx;
+      g += `<text x="${x.toFixed(2)}" y="${(y+fs*0.33).toFixed(2)}" font-family="${fam}"
+             font-size="${(fs*0.92).toFixed(2)}" fill="${AX}">${richSVG(s.label, fs*0.92)}</text>`;
+      x += richWidth(s.label, fs*0.92) + gapx;
+    }
+  }
+
+  // axis titles
+  const spanW = W - mL - mR;
+  const xTitleY = mT + ph + tp + digitH + xp + xCap;
+  const yTitleX = yCap;
+  g += `<text x="${(mL + spanW/2).toFixed(2)}" y="${xTitleY.toFixed(2)}" font-family="${fam}"
+         font-size="${fs}" fill="${AX}" text-anchor="middle">${richSVG(F.xTitle, fs)}</text>`;
+  g += `<text transform="translate(${yTitleX.toFixed(2)},${(mT + ph/2).toFixed(2)}) rotate(-90)"
+         font-family="${fam}" font-size="${fs}" fill="${AX}" text-anchor="middle">${richSVG(F.yTitle, fs)}</text>`;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${F.width}in" height="${F.height}in" `
+       + `viewBox="0 0 ${W.toFixed(2)} ${H.toFixed(2)}" shape-rendering="geometricPrecision">${g}</svg>`;
+}
+
+/* ---------- figure controls ---------- */
+function renderCondRows(){
+  const F = S.fig;
+  const nv = S.verts.length;
+  if(!F.condsTouched){
+    for(let i = 0; i < 3; i++) F.conds[i] = nv ? (S.selVtx + i) % nv : -1;
+  }
+  for(let i = 0; i < 3; i++) if(F.conds[i] >= nv) F.conds[i] = nv ? nv-1 : -1;
+  const opts = i => S.verts.map((v, k) =>
+      `<option value="${k}" ${F.conds[i]===k?"selected":""}>${String.fromCharCode(65+k)} — ${esc(v.act.join(" + "))}</option>`
+    ).join("") + `<option value="-1" ${F.conds[i]===-1?"selected":""}>current Δμ</option>`;
+  let h = "";
+  for(let i = 0; i < F.n; i++){
+    h += `<div class="condrow">
+      <span class="pl">${F.n>1 ? "("+String.fromCharCode(97+i)+")" : "—"}</span>
+      <select id="cond-${i}">${opts(i)}</select>
+      <input type="text" id="cap-${i}" placeholder="${esc(autoCaption(F.conds[i])) || "caption"}" value="${esc(F.caps[i])}">
+    </div>`;
+  }
+  $("cond-rows").innerHTML = h;
+  for(let i = 0; i < F.n; i++){
+    $("cond-"+i).addEventListener("change", e => {
+      F.condsTouched = true; F.conds[i] = +e.target.value; renderCondRows(); renderFigure(); });
+    $("cap-"+i).addEventListener("input", e => { F.caps[i] = e.target.value; renderFigure(); });
+  }
+}
+function renderSeriesRows(){
+  const names = defectNames();
+  $("fig-series").innerHTML = names.map((nm, i) => {
+    const st = styleOf(nm);
+    return `<tr>
+      <td><input type="checkbox" id="sv${i}" ${st.vis?"checked":""} aria-label="show ${esc(nm)}"></td>
+      <td><input type="color" id="sc${i}" value="${st.color}" aria-label="color ${esc(nm)}"></td>
+      <td class="muted" style="font-size:11.5px">${esc(nm)}</td>
+      <td style="width:100%"><input type="text" id="sl${i}" value="${esc(st.label)}" aria-label="label ${esc(nm)}"></td>
+    </tr>`;
+  }).join("") || `<tr><td class="muted">No defects loaded.</td></tr>`;
+  names.forEach((nm, i) => {
+    $("sv"+i).addEventListener("change", e => { styleOf(nm).vis = e.target.checked; renderFigure(); });
+    $("sc"+i).addEventListener("input",  e => { styleOf(nm).color = e.target.value; renderFigure(); });
+    $("sl"+i).addEventListener("input",  e => { styleOf(nm).label = e.target.value; renderFigure(); });
+  });
+}
+function renderFigure(){
+  const F = S.fig;
+  try { $("fig-prev").innerHTML = buildFigureSVG(); }
+  catch(err){ $("fig-prev").innerHTML = `<div class="note bad">Figure could not be drawn: ${esc(err.message)}</div>`; }
+  $("fig-dim").innerHTML = `<span class="dim">${F.width.toFixed(2)} × ${F.height.toFixed(2)} in`
+    + ` · <b>${Math.round(F.width*300)} × ${Math.round(F.height*300)} px</b> at 300 dpi</span>`;
+  $("f-xt").disabled = F.autoTick; $("f-yt").disabled = F.autoTick;
+  $("f-ymin").disabled = F.yAuto;  $("f-ymax").disabled = F.yAuto;
+}
+
+/* ---------- figure wiring ---------- */
+function bindFig(id, key, kind){
+  const el = $(id);
+  const ev = kind === "check" ? "change" : (kind === "text" ? "input" : "change");
+  el.addEventListener(ev, () => {
+    if(kind === "check"){ S.fig[key] = el.checked; }
+    else if(kind === "num" || kind === "pad"){
+      const v = parseFloat(el.value);
+      S.fig[key] = Number.isFinite(v) ? v : S.fig[key];   // 0 is a valid value
+    } else { S.fig[key] = el.value; }
+    renderFigure();
+  });
+}
+$("f-n").addEventListener("change", e => {
+  S.fig.n = +e.target.value; renderCondRows(); renderFigure();
+});
+$("f-preset").addEventListener("change", e => {
+  if(e.target.value === "custom") return;
+  S.fig.width = parseFloat(e.target.value);
+  $("f-w").value = S.fig.width.toFixed(3);
+  renderFigure();
+});
+$("f-w").addEventListener("change", e => {
+  S.fig.width = Math.min(14, Math.max(1.5, parseFloat(e.target.value) || 3.3));
+  $("f-preset").value = "custom"; renderFigure();
+});
+bindFig("f-h","height","num");
+bindFig("f-font","font","sel");
+bindFig("f-fs","fs","num");
+bindFig("f-lw","lw","num");
+bindFig("f-alw","axisLW","num");
+bindFig("f-xt","xTick","num");
+bindFig("f-yt","yTick","num");
+bindFig("f-mn","minor","num");
+bindFig("f-ymin","yMin","num");
+bindFig("f-ymax","yMax","num");
+bindFig("f-tickpad","tickPad","pad");
+bindFig("f-xpad","xPad","pad");
+bindFig("f-ypad","yPad","pad");
+bindFig("f-pgap","pGap","pad");
+$("f-tight").addEventListener("click", () => {
+  const v = {tickPad:1, xPad:0, yPad:0, pGap:4};
+  for(const k in v){ S.fig[k] = v[k]; }
+  $("f-tickpad").value = 1; $("f-xpad").value = 0; $("f-ypad").value = 0; $("f-pgap").value = 4;
+  renderFigure();
+});
+bindFig("f-xtitle","xTitle","text");
+bindFig("f-ytitle","yTitle","text");
+bindFig("f-autotick","autoTick","check");
+bindFig("f-yauto","yAuto","check");
+bindFig("f-frame","frame","check");
+bindFig("f-gray","gray","check");
+bindFig("f-mk","mk","check");
+bindFig("f-cl","cl","check");
+bindFig("f-letters","letters","check");
+bindFig("f-white","white","check");
+bindFig("f-lm","labelMode","sel");
+
+/* ---------- export ---------- */
+let DL;
+// Inside the claude.ai viewer a page cannot start its own download, so saving goes
+// through the downloads capability. A standalone copy of this file opened from disk
+// has no such restriction, so it falls back to an ordinary browser download.
+const HOSTED = !!(window.claude && window.claude.use);
+async function downloads(){
+  if(DL !== undefined) return DL;
+  try { DL = HOSTED ? await window.claude.use("downloads") : null; }
+  catch { DL = null; }
+  return DL;
+}
+function directSave(filename, data){
+  const blob = data instanceof Blob ? data : new Blob([data], {type:"image/svg+xml"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function figName(ext){
+  const host = (S.hostFormula || "figure").replace(/[^A-Za-z0-9]/g, "");
+  return `${host}_formation_energy.${ext}`;
+}
+async function rasterize(dpi){
+  const svg = buildFigureSVG();
+  const img = new Image();
+  await new Promise((res, rej) => {
+    img.onload = res; img.onerror = () => rej(new Error("the browser could not rasterize the figure"));
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  });
+  const c = document.createElement("canvas");
+  c.width  = Math.round(S.fig.width*dpi);
+  c.height = Math.round(S.fig.height*dpi);
+  const ctx = c.getContext("2d");
+  if(S.fig.white){ ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width, c.height); }
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  return await new Promise(r => c.toBlob(r, "image/png"));
+}
+function figMsg(html, cls){
+  $("fig-msg").innerHTML = html ? `<div class="note ${cls||""}">${html}</div>` : "";
+}
+async function saveFile(filename, data, btn){
+  const d = await downloads();
+  if(!d){
+    if(!HOSTED){ directSave(filename, data); flash(btn, "Saved"); figMsg(""); return; }
+    figMsg("Saving files is not available in this view. Use <b>Copy SVG</b> and paste it into a file instead.", "warn");
+    return;
+  }
+  try {
+    await d.save({filename, data});
+    flash(btn, "Saved");
+    figMsg("");
+  } catch(err){
+    const code = err && err.code;
+    if(code === "declined") figMsg("");
+    else if(code === "rate_limited") figMsg("A save prompt is already open — finish that one first.", "warn");
+    else figMsg(`The file could not be saved (${esc(code || "unknown")}). <b>Copy SVG</b> still works.`, "warn");
+  }
+}
+async function exportPNG(dpi, btn){
+  flash(btn, "Rendering…");
+  try {
+    const blob = await rasterize(dpi);
+    if(!blob) throw new Error("empty image");
+    await saveFile(figName("png"), blob, btn);
+  } catch(err){
+    figMsg(`PNG export failed: ${esc(err.message)}. The SVG export is unaffected.`, "warn");
+  }
+}
+$("b-png").addEventListener("click", e => exportPNG(300, e.target));
+$("b-png6").addEventListener("click", e => exportPNG(600, e.target));
+$("b-svgdl").addEventListener("click", e => saveFile(figName("svg"), buildFigureSVG(), e.target));
+$("b-figcopy").addEventListener("click", async e => {
+  try { await navigator.clipboard.writeText(buildFigureSVG()); flash(e.target, "Copied"); }
+  catch { flash(e.target, "Copy blocked"); }
+});
+downloads().then(d => {
+  if(!d && HOSTED) return;                    // capability refused inside the viewer
+  for(const id of ["b-png","b-png6","b-svgdl"]) $(id).hidden = false;
+});
+
+let rt;
+new ResizeObserver(() => {
+  clearTimeout(rt);
+  rt = setTimeout(() => { renderRegion(); renderMain(); }, 90);
+}).observe(document.getElementById("cb-main"));
+
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderRegion(); renderMain(); });
+new MutationObserver(() => { renderRegion(); renderMain(); })
+  .observe(document.documentElement, {attributes:true, attributeFilter:["data-theme"]});
+
+loadDemo();
+</script>
+
+</body>
+</html>
