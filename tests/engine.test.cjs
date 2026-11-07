@@ -105,3 +105,17 @@ test('PNG gets exactly one correctly checksummed pHYs chunk at requested dpi',()
   assert.equal(chunks,1);
  }
 });
+test('Grace project keeps editable panels, XY envelopes, transitions and manual ticks',()=>{
+ const r=engine(); host(r,'ZnO',-3.5);
+ r('S.gap=2; S.bulk=0; S.vbm=0; S.muRef={Zn:0,O:0}; S.fig.n=2; S.fig.width=7; S.fig.autoTick=false; S.fig.xTick=.5; S.fig.yTick=1; S.fig.yAuto=false; S.fig.yMin=-4; S.fig.yMax=4; S.defects=[{name:"V_O",Etot:0,Ecorr:0,q:1,dn:{O:-1}},{name:"V_O",Etot:1,Ecorr:0,q:0,dn:{O:-1}}];');
+ const agr=r('buildFigureAGR()');
+ for(let p=0;p<2;p++){
+  const mu=r(`condDmu(${p}).O`);
+  assert.ok(agr.includes(`@target G${p}.S0\n@type xy\n0 ${mu}\n1 ${mu+1}\n2 ${mu+1}\n&`));
+  assert.ok(agr.includes(`@target G${p}.S1\n@type xy\n1 ${mu+1}\n&`));
+ }
+ assert.match(agr,/@xaxis tick major 0.5/); assert.match(agr,/@world 0, -4, 2, 4/);
+ assert.ok(agr.includes('V\\sO\\N')); assert.doesNotMatch(agr,/NaN|Infinity/);
+ r('S.fig.mk=false'); assert.doesNotMatch(r('buildFigureAGR()'),/@target G0.S1/);
+ if(process.env.GRACE_TEST_OUTPUT) fs.writeFileSync(process.env.GRACE_TEST_OUTPUT,agr);
+});

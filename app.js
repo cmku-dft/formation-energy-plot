@@ -810,7 +810,7 @@ function requiredNumber(id, name){
   if(!Number.isFinite(n)) throw Error(`${name}: enter a finite number.`);
   return n;
 }
-const EXPORT_IDS = ["b-svg", "b-tsv", "b-png", "b-png6", "b-svgdl", "b-figcopy"];
+const EXPORT_IDS = ["b-svg", "b-tsv", "b-png", "b-png6", "b-svgdl", "b-agr", "b-figcopy"];
 function invalidate(message){
   S.valid = false;
   $("input-status").innerHTML = `<div class="note bad"><b>Inputs need attention.</b> ${esc(message)} Results are cleared until the inputs are corrected.</div>`;
@@ -1001,7 +1001,7 @@ function richSVG(str, fs){
 const richWidth = (str, fs) => richParts(String(str))
   .reduce((w, p) => w + p.t.length*fs*(p.k === "n" ? 0.55 : 0.40), 0);
 
-function buildFigureSVG(){
+function publicationModel(){
   if(!S.valid || !S.verts.length) throw Error("No stable host conditions are available. Check the input energies and phases.");
   const F = S.fig, n = F.n, fs = F.fs, lw = F.lw;
   const W = F.width*72, H = F.height*72;
@@ -1082,6 +1082,11 @@ function buildFigureSVG(){
   if(!(pw > fs*2) || !(ph > fs*2))
     throw new Error("no room left for the plot — reduce the label gaps or increase the figure size");
 
+  return {F,H,W,aw,digitH,fam,fs,gp,hi,legendH,lo,lw,mL,mR,mT,n,panels,ph,pw,tkMaj,tkMin,tp,xCap,xMaj,xMin,xd,xp,yCap,yMaj,yMinT,yd,xStep,yStep};
+}
+
+function buildFigureSVG(){
+  const {F,H,W,aw,digitH,fam,fs,gp,hi,legendH,lo,lw,mL,mR,mT,n,panels,ph,pw,tkMaj,tkMin,tp,xCap,xMaj,xMin,xd,xp,yCap,yMaj,yMinT,yd,xStep,yStep} = publicationModel();
   const AX = "#000000";
   let g = "";
   if(F.white) g += `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff"/>`;
@@ -1214,6 +1219,75 @@ function buildFigureSVG(){
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${F.width}in" height="${F.height}in" `
        + `viewBox="0 0 ${W.toFixed(2)} ${H.toFixed(2)}" shape-rendering="geometricPrecision">${g}</svg>`;
+}
+
+// Grace projects contain native graphs, XY sets and text objects. Keep commands
+// on individual lines even when a user-supplied label contains control characters.
+function graceText(value){
+  const clean = t => t.replace(/[\x00-\x1f\x7f]/g," ").replace(/"/g,"'").replace(/\\/g,"/").replace(/−/g,"-")
+    .replace(/[Δμε]/g, c => "\\x"+({"Δ":"D","μ":"m","ε":"e"}[c])+"\\f{}");
+  return '"' + richParts(String(value)).map(({t,k}) => k==="n" ? clean(t)
+    : (k==="sub" ? "\\s" : "\\S")+clean(t)+"\\N").join("") + '"';
+}
+function buildFigureAGR(){
+  const {F,W,H,mL,mT,pw,ph,gp,panels,lo,hi,xStep,yStep,xd,yd} = publicationModel();
+  const out=["# Grace project file", "@version 50125"], data=[];
+  const cmd=t=>out.push("@"+t);
+  const unit=Math.min(W,H), font=F.font==="serif"?0:4, size=F.fs/(0.025*unit);
+  cmd(`page size ${Math.round(W)}, ${Math.round(H)}`);
+  cmd(`page background fill ${F.white?"on":"off"}`);
+  const colors=new Map([["#000000",1]]);
+  for(const p of panels) for(const s of p.series) if(!colors.has(s.color)){
+    const id=colors.size+1; colors.set(s.color,id);
+    const rgb=s.color.slice(1).match(/../g).map(v=>parseInt(v,16));
+    cmd(`map color ${id} to (${rgb.join(", ")}) , "series${id}"`);
+  }
+  panels.forEach((panel,p)=>{
+    const left=mL+p*(pw+gp), bottom=H-mT-ph;
+    cmd(`g${p} on`); cmd(`with g${p}`);
+    cmd(`world 0, ${lo}, ${S.gap}, ${hi}`);
+    cmd(`view ${left/unit}, ${bottom/unit}, ${(left+pw)/unit}, ${(bottom+ph)/unit}`);
+    cmd(`frame type ${F.frame?0:1}`); cmd(`frame linewidth ${F.axisLW}`);
+    for(const [axis,title,step,prec] of [["xaxis",F.xTitle,xStep,xd],["yaxis",p===0?F.yTitle:"",yStep,yd]]){
+      cmd(`${axis} on`); cmd(`${axis} label ${graceText(title)}`); cmd(`${axis} label font ${font}`);
+      cmd(`${axis} label char size ${size}`); cmd(`${axis} tick major ${step}`);
+      cmd(`${axis} tick minor ticks ${F.minor-1}`); cmd(`${axis} tick place ${F.frame?"both":"normal"}`);
+      cmd(`${axis} ticklabel ${axis==="yaxis" && p>0?"off":"on"}`); cmd(`${axis} ticklabel prec ${prec}`);
+      cmd(`${axis} ticklabel char size ${size}`); cmd(`${axis} ticklabel font ${font}`);
+    }
+    cmd(`legend ${F.labelMode==="legend" && p===0?"on":"off"}`);
+    if(F.labelMode==="legend"){cmd("legend loctype view");cmd(`legend ${left/unit}, ${(H-mT)/unit}`);cmd(`legend char size ${size}`);}
+    let id=0;
+    const label=(text,x,y,color=1,just=0)=>{
+      cmd("with string");cmd("string on");cmd("string loctype world");cmd(`string g${p}`);cmd(`string ${x}, ${y}`);
+      cmd(`string color ${color}`);cmd(`string font ${font}`);cmd(`string char size ${size}`);cmd(`string just ${just}`);cmd(`string def ${graceText(text)}`);
+    };
+    const caption=[F.letters && panels.length>1?`(${String.fromCharCode(97+p)})`:"",panel.cap].filter(Boolean).join(" ");
+    if(caption) label(caption,0.02*S.gap,hi-.07*(hi-lo));
+    panel.series.forEach((series,i)=>{
+      if(!series.segs.length) return;
+      const color=colors.get(series.color);
+      const set=(points,markers)=>{
+        const k=id++, key=`s${k}`; cmd(`with g${p}`);
+        cmd(`${key} comment ${graceText(series.label+(markers?" transitions":""))}`);
+        cmd(`${key} legend ${graceText(markers?"":series.label)}`);
+        cmd(`${key} line type ${markers?0:1}`);cmd(`${key} line linestyle ${F.gray?1+i%5:1}`);
+        cmd(`${key} line color ${color}`);cmd(`${key} line linewidth ${F.lw}`);cmd(`${key} symbol ${markers?1:0}`);
+        if(markers){cmd(`${key} symbol color ${color}`);cmd(`${key} symbol fill color ${color}`);cmd(`${key} symbol fill pattern 1`);}
+        data.push(`@target G${p}.S${k}`,"@type xy",...points.map(pt=>pt.join(" ")),"&");
+      };
+      const points=series.segs.map(s=>[s.x0,s.A+s.q*s.x0]);
+      const last=series.segs.at(-1); points.push([last.x1,last.A+last.q*last.x1]); set(points,false);
+      if(F.mk && series.levels.length) set(series.levels.map(l=>[l.eps,l.ef]),true);
+      if(F.labelMode==="end") label(series.label,.99*S.gap,Math.max(lo,Math.min(hi,points.at(-1)[1])),color,2);
+      if(F.cl) for(const s of series.segs){
+        if((s.x1-s.x0)*pw/S.gap<F.fs*2.2) continue;
+        const x=(s.x1+s.x0)/2,y=s.A+s.q*x;
+        if(y>=lo && y<=hi) label(sgn(s.q),x,y+.015*(hi-lo),color,1);
+      }
+    });
+  });
+  return [...out,...data,""].join("\n");
 }
 
 /* ---------- figure controls ---------- */
@@ -1406,11 +1480,15 @@ $("b-svgdl").addEventListener("click", async e => {
   try { await saveFile(figName("svg"), buildFigureSVG(), e.target); }
   catch(err){ figMsg(esc(err.message), "warn"); }
 });
+$("b-agr").addEventListener("click", async e => {
+  try { await saveFile(figName("agr"), new Blob([buildFigureAGR()], {type:"text/plain"}), e.target); }
+  catch(err){ figMsg(esc(err.message), "warn"); }
+});
 $("b-figcopy").addEventListener("click", async e => {
   try { await navigator.clipboard.writeText(buildFigureSVG()); flash(e.target, "Copied"); }
   catch { flash(e.target, "Copy blocked"); }
 });
-for(const id of ["b-png","b-png6","b-svgdl"]) $(id).hidden = false;
+for(const id of ["b-png","b-png6","b-svgdl","b-agr"]) $(id).hidden = false;
 
 const INPUT_IDS = ["f-host","f-dhf","f-bulk","f-vbm","f-gap","ta-def","ta-ph"];
 $("b-save-inputs").addEventListener("click", () => {
