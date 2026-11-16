@@ -84,3 +84,25 @@ python3 -m http.server 8766 --bind 127.0.0.1
 Open `http://127.0.0.1:8766/`. There are no npm dependencies to install. You can also open `index.html` locally with `app.js` alongside it; clipboard permissions may be more limited on file URLs.
 
 The automated tests cover formula/CSV validation, binary/ternary/quaternary constraints, infeasible hosts, atom-count signs, reference energies and corrections, transition levels, publication SVG and PNG resolution metadata. Browser checks additionally cover rendering and exports.
+# Stability-only calculations and Chemical Potential Lab files
+
+Chemical-potential stability is calculated independently of defect inputs. Enter
+the host formula, its formation enthalpy in eV per formula unit, and competing
+phases, then Calculate. Empty or invalid defect entries no longer clear the
+stability diagram. Defect plots and exports remain disabled until their own
+inputs (including bulk energy, VBM, gap and elemental references) are valid.
+
+Use **Open inputs / Lab session** to open `chemical-potential-session.json`
+saved by Chemical Potential Lab (schema version 1). This replaces the stability
+inputs and clears old defect data and electronic inputs; save your work first.
+Formation and total energies with formula/atom/cell bases are supported.
+Cell energies are divided by formula units per cell; per-atom energies are
+multiplied by the atoms in the entered formula. Elemental references are
+subtracted only in total-energy mode. Disabled phases are omitted. Missing
+references remain blank rather than being assumed to be zero.
+
+**Save for Chemical Potential Lab** exports a compatible binary/ternary session
+with normalized formation enthalpies, active phases, references and the chosen
+growth condition. Defects and figure styling are not included. Four-element
+Explorer hosts cannot be exported because Lab supports only two or three
+elements. Use **Save inputs** for the Explorer's full input file.

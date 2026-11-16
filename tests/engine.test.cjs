@@ -12,6 +12,28 @@ function engine(){
   return expr => vm.runInContext(expr,ctx,{timeout:3000});
 }
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`);
+test('Chemical Potential Lab conversion: total energies, units, disabled phases and references',()=>{
+ const r=engine();
+ r(`var session={schemaVersion:1,model:{mode:'total',target:{formula:'ZnO',energy:-20,basis:'cell',units:2},refs:{Zn:-1,O:-4},phases:[{formula:'ZnO2',energy:-5,basis:'atom'},{formula:'invalid',enabled:false}]}};`);
+ near(r('fromChemicalSession(session).enthalpy'),-5);
+ near(r('fromChemicalSession(session).phases[0].dHf'),-6);
+ assert.equal(r('fromChemicalSession(session).phases.length'),1);
+ r('session.model.refs.O=""');
+ assert.throws(()=>r('fromChemicalSession(session)'),/Missing reference/);
+ r('session.model.mode="formation"');
+ near(r('fromChemicalSession(session).enthalpy'),-10);
+ assert.ok(r('Number.isNaN(fromChemicalSession(session).refs.O)'));
+ r('session.model.target.units=0');
+ assert.throws(()=>r('fromChemicalSession(session)'),/formula units/);
+});
+test('Chemical Potential Lab normalized session roundtrip preserves stability constraints',()=>{
+ const r=engine(); host(r,'Ba3V2O8',-37.345,[{name:'BaO',comp:{Ba:1,O:1},dHf:-4.97},{name:'V2O5',comp:{V:2,O:5},dHf:-15.857},{name:'VO2',comp:{V:1,O:2},dHf:-7.118}]);
+ r('S.hostFormula="Ba3V2O8"; S.muRef={Ba:-1.908,V:-8.962,O:-4.9296}; var converted=fromChemicalSession(toChemicalSession());');
+ near(r('converted.enthalpy'),-37.345);
+ assert.equal(r('converted.phases.length'),3);
+ near(r('converted.refs.O'),-4.9296);
+ assert.ok(r('S.elements.every(e=>Math.abs(converted.dmu[e]-S.dmu[e])<1e-8)'));
+});
 function host(run,formula,dhf,phases=[]){ run(`S.hostCoeff=parseFormula(${JSON.stringify(formula)}); S.elements=Object.keys(S.hostCoeff); S.hostDHf=${dhf}; S.phases=${JSON.stringify(phases)}; S.axX=S.elements[0]; S.axY=S.elements[1]; computeVertices(); S.valid=true; S.dmu={...S.verts[0]?.dmu};`); }
 test('formulas: nested groups, fractional stoichiometry and invalid input',()=>{
  const r=engine(); near(r('parseFormula("Ca3(PO4)2").O'),8); near(r('parseFormula("Ba0.5Sr0.5TiO3").Ba'),.5);

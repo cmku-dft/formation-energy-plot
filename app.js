@@ -178,7 +178,7 @@ function loadPhases(text, elements){
   rows.forEach((r, n) => {
     const nm = r[iName];
     if(!nm){ errs.push(`row ${n+2}: missing phase name`); return; }
-    const dHf = numOr(r[iH], NaN);
+    let dHf = numOr(r[iH], NaN);
     if(!Number.isFinite(dHf)){ errs.push(`row ${n+2}: bad dHf`); return; }
     let comp = {};
     if(hasCols){
@@ -190,6 +190,8 @@ function loadPhases(text, elements){
     const foreign = Object.keys(comp).filter(k => !elements.includes(k));
     if(foreign.length){ errs.push(`${nm}: contains elements outside the host (${foreign.join(", ")})`); return; }
     if(!Object.values(comp).every(v => Number.isFinite(v) && v >= 0) || Object.values(comp).every(v => !v)){ errs.push(`${nm}: could not read composition`); return; }
+    try {const col=(name,fallback)=>{const j=head.indexOf(name);return j<0?fallback:r[j];};dHf=normalizeEnergy(dHf,col('energytype','formation'),col('basis','formula'),col('units',1),comp,S.muRef);}
+    catch(err){errs.push(`${nm}: ${err.message}`);return;}
     list.push({name:nm, comp, dHf});
   });
   return {list, errs};
@@ -455,6 +457,7 @@ function renderRegion(){
 let MAINGEO = null;
 function renderMain(){
   if(!S.valid) return;
+  if(S.defectReady === false){ $("svg-main").innerHTML = ""; return; }
   if(!S.verts.length){ $("svg-main").innerHTML = ""; return; }
   const svg = document.getElementById("svg-main");
   const box = document.getElementById("cb-main");
@@ -627,7 +630,7 @@ function renderChips(){
   const cond = S.verts[S.selVtx];
   $("chips").innerHTML = [
     `<span class="chip">host <b>${esc(S.hostFormula)}</b></span>`,
-    `<span class="chip">gap <b>${fx(S.gap,2)} eV</b></span>`,
+    S.defectReady === false ? '<span class="chip">stability only</span>' : `<span class="chip">gap <b>${fx(S.gap,2)} eV</b></span>`,
     `<span class="chip">${n} defect${n===1?"":"s"} · <b>${S.defects.length}</b> entries</span>`,
     `<span class="chip">Δμ <b>${S.elements.map(e => `${e} ${fx(S.dmu[e],2)}`).join(" · ")}</b></span>`
   ].join("");
@@ -765,7 +768,14 @@ function pickVertex(i){
 function draw(){
   if(!S.valid) return;
   renderChips(); renderVertexList(); renderDmuInputs(); renderFeas();
-  renderLegend(); renderRegion(); renderMain(); renderTables(); renderMsgs();
+  renderRegion(); renderMsgs();
+  if(S.defectReady === false){
+    for(const id of ["legend","svg-main","fig-prev","cond-rows","fig-series"]) $(id).innerHTML = "";
+    for(const id of ["tbl-lv","tbl-edge"]) $(id).querySelector("tbody").innerHTML = "";
+    $("main-msg").innerHTML += '<div class="note">Stability region is available. Add valid defect entries, bulk energy, VBM, band gap and elemental references to enable defect plots.</div>';
+    return;
+  }
+  renderLegend(); renderMain(); renderTables();
   renderCondRows(); renderSeriesRows(); renderFigure();
 }
 
@@ -776,11 +786,7 @@ function readSystem(){
   if(Object.keys(hc).length < 2 || Object.keys(hc).length > 4) throw Error("Use a host containing 2–4 elements.");
   const els = Object.keys(hc);
   const changed = els.join() !== S.elements.join();
-  S.hostDHf = requiredNumber("f-dhf", "Host formation enthalpy");
-  S.bulk = requiredNumber("f-bulk", "Bulk supercell energy");
-  S.vbm = requiredNumber("f-vbm", "VBM energy");
-  S.gap = requiredNumber("f-gap", "Band gap");
-  if(S.gap <= 0) throw Error("The band gap must be greater than zero.");
+  S.hostDHf = requiredNumber("f-dhf", "Host energy");
   S.hostCoeff = hc; S.elements = els;
   if(changed){
     for(const e of els) if(!(e in S.muRef)) S.muRef[e] = 0;
@@ -789,13 +795,23 @@ function readSystem(){
   }
   for(const e of els){
     const inp = $("mu-"+e);
-    if(inp) S.muRef[e] = requiredNumber("mu-"+e, `Reference for ${e}`);
+    if(inp) S.muRef[e] = numOr(inp.value, NaN);
   }
+  S.hostDHf=normalizeEnergy(S.hostDHf,$('host-type').value,$('host-basis').value,$('host-units').value,hc,S.muRef);
+  $('host-normalized').textContent=`Calculated host ΔHf: ${S.hostDHf.toFixed(6)} eV/formula. Cell formula count applies only to eV/cell.`;
+}
+function normalizeEnergy(value,type,basis,units,comp,refs){
+  if(basis==='cell'){const n=numOr(units,NaN);if(!(n>0))throw Error('Enter positive formula units per cell.');value/=n;}
+  else if(basis==='atom')value*=Object.values(comp).reduce((a,b)=>a+b,0);
+  else if(basis!=='formula')throw Error('Invalid energy basis.');
+  if(type==='total')for(const [e,n] of Object.entries(comp)){if(!Number.isFinite(refs[e]))throw Error(`Enter reference energy for ${e}.`);value-=n*refs[e];}
+  else if(type!=='formation')throw Error('Invalid energy type.');
+  if(!Number.isFinite(value))throw Error('Invalid normalized energy.');return value;
 }
 function buildMuRefGrid(){
   $("muref-grid").innerHTML = S.elements.map(e => `
     <div class="field"><label for="mu-${e}">${e}</label>
-      <input type="number" step="0.0001" id="mu-${e}" value="${(S.muRef[e]||0).toFixed(4)}"></div>`).join("");
+      <input type="number" step="0.0001" id="mu-${e}" value="${Number.isFinite(S.muRef[e]) ? S.muRef[e] : ''}"></div>`).join("");
   S.elements.forEach(e => $("mu-"+e).addEventListener("change", recompute));
 }
 function buildAxisSelects(){
@@ -821,18 +837,29 @@ function invalidate(message){
   EXPORT_IDS.forEach(id => $(id).disabled = true);
 }
 function recompute(){
+ for(const id of ['tip-region','tip-main']){const tip=$(id);tip.classList.remove('on');tip.innerHTML='';}
  try {
   readSystem();
-  const dres = loadDefects($("ta-def").value, S.elements);
   const pres = loadPhases($("ta-ph").value, S.elements);
-  S.defects = dres.list; S.phases = pres.list;
-  S.errors = [...dres.errs, ...pres.errs];
-  if(S.errors.length) throw Error(S.errors.join("; "));
-  if(!S.defects.length) throw Error("Add at least one defect entry.");
+  S.phases = pres.list;
+  if(pres.errs.length) throw Error(pres.errs.join("; "));
+  S.defects = []; S.errors = []; S.defectReady = false;
+  try {
+    const dres = $("ta-def").value.trim() ? loadDefects($("ta-def").value, S.elements) : {list:[],errs:[]};
+    if(dres.errs.length) throw Error(dres.errs.join("; "));
+    if(dres.list.length){
+      S.bulk = requiredNumber("f-bulk", "Bulk supercell energy");
+      S.vbm = requiredNumber("f-vbm", "VBM energy");
+      S.gap = requiredNumber("f-gap", "Band gap");
+      if(S.gap <= 0) throw Error("The band gap must be greater than zero.");
+      for(const e of S.elements) S.muRef[e] = requiredNumber("mu-"+e, `Reference for ${e}`);
+      S.defects = dres.list; S.defectReady = true;
+    }
+  } catch(err){ S.errors = [err.message]; }
   computeVertices();
   S.valid = true;
-  $("input-status").innerHTML = "";
-  EXPORT_IDS.forEach(id => $(id).disabled = !S.verts.length);
+  $("input-status").innerHTML = S.defectReady ? "" : '<div class="note">Stability-only mode: defect inputs are optional and do not block the chemical-potential diagram.</div>';
+  EXPORT_IDS.forEach(id => $(id).disabled = !S.verts.length || !S.defectReady);
   if(!S.verts.length){
     for(const e of S.elements) S.dmu[e] = S.hostDHf / (S.elements.length*S.hostCoeff[e]);
   } else {
@@ -849,6 +876,7 @@ function recompute(){
 }
 
 function loadDemo(){
+  $('host-type').value='formation';$('host-basis').value='formula';$('host-units').value=1;
   $("f-host").value = DEMO.host; $("f-dhf").value = DEMO.dHf;
   $("f-bulk").value = DEMO.bulk; $("f-vbm").value = DEMO.vbm; $("f-gap").value = DEMO.gap;
   S.muRef = {...DEMO.muRef}; S.elements = [];
@@ -857,6 +885,58 @@ function loadDemo(){
   $("src-tag").textContent = "illustrative example";
   $("data-notice").textContent = "The CuInSe₂ example is illustrative, not a validated material dataset. Replace it with your own consistent DFT energies. Calculations and file processing stay in your browser.";
   recompute();
+}
+
+// Chemical Potential Lab schema v1: normalize energies without changing their references.
+function fromChemicalSession(data){
+  const m = data.model;
+  if(![1,2].includes(data.schemaVersion) || !m || !['formation','total'].includes(m.mode)) throw Error('Choose a Chemical Potential Lab session (schema version 1 or 2).');
+  const formula = s => String(s || '').replace(/[₀₁₂₃₄₅₆₇₈₉]/g,c=>String('₀₁₂₃₄₅₆₇₈₉'.indexOf(c)));
+  const host = formula(m.target?.formula), comp = parseFormula(host);
+  if(!comp || ![2,3].includes(Object.keys(comp).length)) throw Error('Chemical Potential Lab sessions require a binary or ternary host.');
+  const elements = Object.keys(comp), refs = Object.fromEntries(elements.map(e=>[e,numOr(m.refs?.[e],NaN)]));
+  const energy = row => {
+    const f = formula(row?.formula), c = parseFormula(f);
+    if(!c || Object.keys(c).some(e=>!elements.includes(e))) throw Error('Invalid phase formula or foreign element.');
+    let h = numOr(row.energy,NaN);
+    if(!Number.isFinite(h)) throw Error(`Invalid energy for ${f}.`);
+    if(row.basis === 'atom') h *= Object.values(c).reduce((a,b)=>a+b,0);
+    else if(row.basis === 'cell'){
+      const n = numOr(row.units,NaN);
+      if(!(n>0)) throw Error(`Invalid formula units per cell for ${f}.`);
+      h /= n;
+    } else if(row.basis && row.basis !== 'formula') throw Error('Unknown energy basis.');
+    const type=row.energyType || m.mode;
+    if(!['formation','total'].includes(type)) throw Error('Unknown energy type.');
+    if(type === 'total') for(const [e,n] of Object.entries(c)){
+      if(!Number.isFinite(refs[e])) throw Error(`Missing reference energy for ${e}.`);
+      h -= n*refs[e];
+    }
+    if(!Number.isFinite(h)) throw Error('Energy conversion overflow.');
+    return {name:f,comp:c,dHf:h};
+  };
+  if(!Array.isArray(m.phases) || m.phases.length>150) throw Error('Enter at most 150 phases.');
+  const target = energy(m.target), phases = m.phases.filter(p=>p.enabled!==false).map(energy);
+  const z=m.eliminated || elements.at(-1), axes=m.axes || [...elements.filter(e=>e!==z),z];
+  if(axes.length!==elements.length || new Set(axes).size!==elements.length || axes.some(e=>!elements.includes(e))) throw Error('Invalid session axes.');
+  let dmu=null;
+  if(Array.isArray(data.selected) && data.selected.length===2 && data.selected.every(Number.isFinite)){
+    // Both Lab's binary line and ternary view store [X,Y].
+    dmu={[axes[0]]:data.selected[0],[axes[1]]:data.selected[1]};
+    if(elements.length===3) dmu[axes[2]]=(target.dHf-comp[axes[0]]*data.selected[0]-comp[axes[1]]*data.selected[1])/comp[axes[2]];
+  }
+  const explanation=`JSON default energy mode: ${m.mode}; host energy type: ${m.target.energyType || m.mode}. Host input: ${m.target.energy} eV/${m.target.basis||'formula'}${m.target.basis==='cell'?`, ${m.target.units} formula units/cell`:''}. Host formation enthalpy used: ${target.dHf} eV/formula. `+'Each entry uses its own energy type, or the session default when omitted. References are subtracted only for total energies. Check the host and phase types if the result is unexpected.';
+  return {host,enthalpy:target.dHf,phases,refs,axes,dmu,explanation,own:data.ownEnergies===true};
+}
+function toChemicalSession(){
+  if(!S.valid || ![2,3].includes(S.elements.length)) throw Error('Calculate a binary or ternary stability region first.');
+  const formula=c=>Object.entries(c).filter(([,n])=>n>0).map(([e,n])=>e+(n===1?'':n)).join('');
+  const axes=[S.axX,...S.elements.filter(e=>e!==S.axX)];
+  if(S.elements.length===3 && S.axY!==S.axX){ axes.splice(1,axes.length-1,S.axY,...S.elements.filter(e=>e!==S.axX && e!==S.axY)); }
+  return {schemaVersion:1,ownEnergies:S.chemicalOwn===true,view:'2d',selected:S.verts.length?[S.dmu[axes[0]],S.dmu[axes[1]]]:null,
+    model:{mode:'formation',axes,eliminated:axes.at(-1),refs:Object.fromEntries(S.elements.map(e=>[e,Number.isFinite(S.muRef[e])?S.muRef[e]:''])),
+      target:{formula:S.hostFormula,energy:S.hostDHf,basis:'formula',units:1},
+      phases:S.phases.map(p=>({formula:formula(p.comp),energy:p.dHf,basis:'formula',units:1,enabled:true}))}};
 }
 
 /* ============================================================ wiring */
@@ -1002,6 +1082,7 @@ const richWidth = (str, fs) => richParts(String(str))
   .reduce((w, p) => w + p.t.length*fs*(p.k === "n" ? 0.55 : 0.40), 0);
 
 function publicationModel(){
+  if(S.defectReady === false) throw Error("Add valid defect inputs before exporting a defect figure.");
   if(!S.valid || !S.verts.length) throw Error("No stable host conditions are available. Check the input energies and phases.");
   const F = S.fig, n = F.n, fs = F.fs, lw = F.lw;
   const W = F.width*72, H = F.height*72;
@@ -1491,10 +1572,16 @@ $("b-figcopy").addEventListener("click", async e => {
 for(const id of ["b-png","b-png6","b-svgdl","b-agr"]) $(id).hidden = false;
 
 const INPUT_IDS = ["f-host","f-dhf","f-bulk","f-vbm","f-gap","ta-def","ta-ph"];
+for(const id of ['host-type','host-basis','host-units'])$(id).addEventListener('change',()=>{$('import-explanation').hidden=true;recompute();});
+$("b-save-lab").addEventListener("click",()=>{
+  try { directSave('chemical-potential-session.json',new Blob([JSON.stringify(toChemicalSession(),null,2)],{type:'application/json'})); }
+  catch(err){ $("input-status").textContent=err.message; }
+});
 $("b-save-inputs").addEventListener("click", () => {
   if(!S.valid){ $("input-status").scrollIntoView({behavior:"smooth"}); return; }
   const data = {format:"defect-formation-explorer",version:1,
     inputs:Object.fromEntries(INPUT_IDS.map(id=>[id,$(id).value])),
+    hostEnergy:{type:$('host-type').value,basis:$('host-basis').value,units:$('host-units').value},
     references:Object.fromEntries(S.elements.map(el=>[el,$("mu-"+el).value])),
     dmu:{...S.dmu}};
   directSave(figName("json"),new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
@@ -1504,12 +1591,35 @@ $("u-inputs").addEventListener("change", async e => {
   try {
     if(file.size > 2000000) throw Error("Input file must be smaller than 2 MB.");
     const data=JSON.parse(await file.text());
+    if([1,2].includes(data.schemaVersion) && data.model){
+      const imported=fromChemicalSession(data);
+      $("import-explanation").hidden=false;
+      $("import-explanation").textContent=imported.explanation;
+      $("f-host").value=imported.host; $("f-dhf").value=data.model.target.energy;
+      $('host-type').value=data.model.target.energyType || data.model.mode;
+      $('host-basis').value=data.model.target.basis || 'formula';
+      $('host-units').value=data.model.target.units ?? 1;
+      $("ta-ph").value='phase,dHf\n'+imported.phases.map(p=>`${p.name},${p.dHf}`).join('\n');
+      for(const id of ['ta-def','f-bulk','f-vbm','f-gap']) $(id).value='';
+      S.elements=[]; S.muRef=imported.refs; S.chemicalOwn=imported.own;
+      S.dmu={}; S.selVtx=0; S.hidden.clear(); S.fig.condsTouched=false;
+      recompute();
+      S.axX=imported.axes[0]; S.axY=imported.axes[1]; orderVertices(); buildAxisSelects();
+      if(imported.dmu){ const f=feasibility(imported.dmu); if(Math.abs(f.hostResid)<1e-6 && !f.viol.length) S.dmu=imported.dmu; }
+      S.selVtx=S.verts.findIndex(v=>S.elements.every(el=>Math.abs(v.dmu[el]-S.dmu[el])<1e-6));
+      draw();
+      $("src-tag").textContent='Chemical Potential Lab session';
+      $("data-notice").textContent='Imported host energy, type and units preserved exactly from the session. Calculated host ΔHf is shown separately. Competing phases are normalized to formation enthalpies per formula. '+(imported.own?'User-supplied energies.':'Check source energy provenance before research use.')+' Defect inputs were cleared. Enter your bulk/VBM/gap and elemental references before adding defects.';
+      e.target.value='';
+      return;
+    }
     if(data.format !== "defect-formation-explorer" || data.version !== 1 ||
       !INPUT_IDS.every(id=>typeof data.inputs?.[id] === "string")) throw Error("Choose an input file saved by this app.");
     const comp=parseFormula(data.inputs["f-host"]);
-    if(!comp || !Object.keys(comp).every(el=>Number.isFinite(numOr(data.references?.[el],NaN)))) throw Error("Missing or invalid elemental references.");
+    if(!comp) throw Error("Invalid host formula.");
     INPUT_IDS.forEach(id=>$(id).value=data.inputs[id]);
-    S.elements=[]; S.muRef=Object.fromEntries(Object.keys(comp).map(el=>[el,Number(data.references[el])]));
+    $('host-type').value=data.hostEnergy?.type||'formation';$('host-basis').value=data.hostEnergy?.basis||'formula';$('host-units').value=data.hostEnergy?.units||1;
+    S.elements=[]; S.muRef=Object.fromEntries(Object.keys(comp).map(el=>[el,numOr(data.references?.[el],NaN)]));
     S.selVtx=0; S.hidden.clear(); S.fig.condsTouched=false;
     recompute();
     if(S.valid && S.elements.every(el=>Number.isFinite(data.dmu?.[el]))){
