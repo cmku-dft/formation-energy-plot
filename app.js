@@ -869,9 +869,15 @@ function renderDnSummary(){
   const seen = new Map();
   for(const d of S.defects) if(!seen.has(d.name)) seen.set(d.name, d);
   const label = {"name":"from name", "columns, match name":"columns ✓ name", "columns":"columns (name not in standard notation)"};
+  // Pair each Δn with the chemical potential it multiplies at the selected condition.
+  const M = S.valid && S.elements.every(e => Number.isFinite(S.dmu[e])) ? fullDmu(S.dmu) : null;
+  const cond = S.verts[S.selVtx] ? `vertex ${String.fromCharCode(65 + S.selVtx)}` : "custom Δμ";
+  const muText = dn => M ? Object.entries(dn).filter(([, n]) => n).map(([el, n]) =>
+      `Δμ(${el}) ${fx(M[el], 2)}` + (S.dopants.includes(el) ? ` from ${dopantState(el, S.dmu).src}` : "")).join(", ") : "";
   $("dn-summary").innerHTML = seen.size
-    ? `<div class="lbl" style="margin-bottom:4px">Δn used</div>` +
-      [...seen.values()].map(d => `<div class="mono" style="font-size:13.5px">${esc(d.name)}: ${esc(fmtDn(d.dn))} <span class="muted">· ${esc(label[d.dnSource] || d.dnSource)}</span></div>`).join("")
+    ? `<div class="lbl" style="margin-bottom:4px">Δn used, with Δμ at ${esc(cond)} (eV)</div>` +
+      [...seen.values()].map(d => `<div style="margin-top:4px"><div class="mono" style="font-size:13.5px">${esc(d.name)}: ${esc(fmtDn(d.dn))} <span class="muted">· ${esc(label[d.dnSource] || d.dnSource)}</span></div>` +
+        (muText(d.dn) ? `<div class="muted mono" style="font-size:12.5px">${esc(muText(d.dn))}</div>` : "") + `</div>`).join("")
     : "";
   $("dn-summary").hidden = !seen.size;
 }

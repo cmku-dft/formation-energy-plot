@@ -19,7 +19,7 @@ A browser-based app for plotting DFT defect formation energies and thermodynamic
 The `examples/` folder holds input files in the **Save inputs** format. Load them with the buttons under **Examples and reset**, or download one and open it with **Open inputs / Lab session**. All numbers are illustrative: they were chosen to show the format and typical behaviour, not taken from a real calculation.
 
 - `ZnO_native_defects.json` (no element columns: Δn comes from the names): V_O (deep, negative-U ε(2+/0)), V_Zn (acceptor, ε(0/−) and ε(−/2−)) and Zn_i (shallow donor), Zn-rich and O-rich limits.
-- `ZnO_Al_doped.json` (with element columns, which are checked against the names): the same defects plus Al_Zn and Al_i, with Δμ_Al set by Al₂O₃ (`Δμ_Al = [ΔHf(Al2O3) − 3Δμ_O]/2`). The phase table contains a commented-out `ZnAl2O4` line. Remove the `#` and press **Calculate** to see the spinel become the limiting phase. Next to ZnO it is the real solubility limit, because ZnO + Al₂O₃ → ZnAl₂O₄ is exothermic.
+- `ZnO_Al_doped.json` (also name-only): the same defects plus Al_Zn and Al_i, with Δμ_Al set automatically by Al₂O₃ in the phase table (`Δμ_Al = [ΔHf(Al2O3) − 3Δμ_O]/2`). The phase table contains a commented-out `ZnAl2O4` line. Remove the `#` and press **Calculate** to see the spinel become the limiting phase. Next to ZnO it is the real solubility limit, because ZnO + Al₂O₃ → ZnAl₂O₄ is exothermic.
 
 ### Defect table example (illustrative values only)
 
@@ -61,7 +61,7 @@ Text in `()`, `[]` or `{}` and charge marks such as `^2+` are ignored, so `V_O(s
 - **An element that is neither in the host nor declared as a dopant** (for example `Mn_Zn` without Mn under Extrinsic dopants) is an error asking you to declare it.
 - **When vanadium is in the system,** `V_X` is ambiguous. Write vacancies as `Vac_X`, or give element columns.
 
-A summary under the defect table shows the Δn used for each defect and where it came from (name, or columns checked against the name).
+A summary under the defect table shows the Δn used for each defect and where it came from (name, or columns checked against the name). It also shows the chemical potential that multiplies each Δn at the selected condition, including the phase that sets each dopant's Δμ (for example *Δμ(Al) −3.30 eV from Al2O3*). The defect table holds atom counts only; chemical potentials always come from the stability region and the phase table.
 
 ### Competing-phase table
 
