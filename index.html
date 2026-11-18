@@ -346,6 +346,8 @@ th .nt{text-transform:none; letter-spacing:0}
             <div class="field"><label for="f-dhf">Host energy (type and units below)</label>
               <input type="number" id="f-dhf" step="0.01" value="-2.37"></div>
           </div>
+          <div class="field"><label for="f-dop">Extrinsic dopants (optional)</label>
+            <input type="text" id="f-dop" value="" placeholder="e.g. Mn, Cr, Co" spellcheck="false" autocomplete="off"></div>
           <label>Host energy type<select id="host-type"><option value="formation">Formation enthalpy</option><option value="total">Raw total energy</option></select></label>
           <label>Host energy units<select id="host-basis"><option value="formula">eV / formula unit</option><option value="cell">eV / cell (POSCAR)</option><option value="atom">eV / atom</option></select></label>
           <label>Formula units per cell (required for eV/cell)<input id="host-units" type="number" min="0" step="any" value="1"></label>
@@ -372,7 +374,7 @@ th .nt{text-transform:none; letter-spacing:0}
         <summary>Defect entries <span class="tag" id="tag-def"></span></summary>
         <div class="inner stack">
           <div class="note">One row per defect <em>and</em> charge state. Element columns hold
-            Δ<i>n</i> — atoms added (+) or removed (−) versus the bulk supercell. Include a column for every host element, even if all entries are zero. Use the same name and composition for all charge states of a defect. Extrinsic dopants are not supported yet.</div>
+            Δ<i>n</i> — atoms added (+) or removed (−) versus the bulk supercell. Include a column for every host element, even if all entries are zero. Use the same name and composition for all charge states of a defect. For declared extrinsic dopants, add a dopant column (for example <code>Mn</code>: +1 for Mn<sub>Zn</sub>, with <code>Zn</code> −1); a missing dopant column means zero.</div>
           <textarea id="ta-def" rows="8" spellcheck="false" aria-label="Defect CSV"></textarea>
           <div class="btnrow">
             <button class="btn sm primary" id="b-def">Load defects</button>
@@ -387,7 +389,8 @@ th .nt{text-transform:none; letter-spacing:0}
         <div class="inner stack">
           <div class="note">Formation enthalpy per formula unit. Give element columns, or
             leave them out and the formula in <code>phase</code> is parsed. Elemental
-            limits Δμ ≤ 0 are always included automatically. Leave this table empty to apply only elemental limits. Energies are per formula exactly as entered, not per atom.</div>
+            limits Δμ ≤ 0 are always included automatically. Leave this table empty to apply only elemental limits. Energies are per formula exactly as entered, not per atom.
+            Phases containing a declared dopant (for example MnO, Mn<sub>2</sub>O<sub>3</sub>, MnO<sub>2</sub> or ZnMn<sub>2</sub>O<sub>4</sub>) set that dopant's solubility limit; they do not change the host stability region. Reference all enthalpies to the same elemental energies, including the dopant metal.</div>
           <textarea id="ta-ph" rows="6" spellcheck="false" aria-label="Competing phase CSV"></textarea>
           <div class="btnrow">
             <button class="btn sm primary" id="b-ph">Load phases</button>
@@ -420,6 +423,12 @@ th .nt{text-transform:none; letter-spacing:0}
           finite-size correction you supply per entry — FNV, eFNV, Lany–Zunger — the app
           treats it as a fixed additive term and never recomputes it. Include potential alignment in that number only if it is not already included in your correction scheme; do not count it twice. Use bulk and defect supercells of the same size. The app does not calculate correction terms or equilibrium Fermi levels.
         </p>
+        <p style="font-size:12px; color:var(--ink-2)">
+          <b>Dopants.</b> At each host condition Δμ<sub>D</sub> is set by the solubility limit:
+          Δμ<sub>D</sub> = min[0, (Δ<i>H</i><sub>f</sub>(P) − Σ<sub>i</sub> <i>b<sub>i</sub></i>Δμ<sub>i</sub>)/<i>a</i>] over every
+          dopant phase P = D<sub><i>a</i></sub>H<sub><i>b</i></sub>…. With MnO<sub>2</sub>,
+          Δμ<sub>Mn</sub> = Δ<i>H</i><sub>f</sub>(MnO<sub>2</sub>) − 2Δμ<sub>O</sub>, so it falls as the growth becomes O-rich.
+        </p>
       </div>
     </div>
   </div>
@@ -449,10 +458,11 @@ th .nt{text-transform:none; letter-spacing:0}
               <div class="vtx-list" id="vtx-list"></div>
             </div>
             <div>
-              <div class="lbl" style="margin-bottom:6px">Δμ in use (eV)</div>
+              <div class="lbl" style="margin-bottom:6px;text-transform:none;letter-spacing:.04em">Δμ IN USE (eV)</div>
               <div id="dmu-inputs" class="stack" style="gap:6px"></div>
             </div>
             <div id="feas"></div>
+            <div id="dop-panel" class="stack"></div>
           </div>
         </div>
       </div>

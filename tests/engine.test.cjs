@@ -141,3 +141,63 @@ test('Grace project keeps editable panels, XY envelopes, transitions and manual 
  r('S.fig.mk=false'); assert.doesNotMatch(r('buildFigureAGR()'),/@target G0.S1/);
  if(process.env.GRACE_TEST_OUTPUT) fs.writeFileSync(process.env.GRACE_TEST_OUTPUT,agr);
 });
+test('dopant solubility limit follows the most stable dopant phase and moves with host Δμ',()=>{
+ // Illustrative numbers: ZnO host with Mn oxides as solubility-limiting phases.
+ const r=engine(); host(r,'ZnO',-3.5);
+ r('S.dopants=["Mn"]; S.dopSet={}; var pr=loadPhases("phase,dHf\\nMnO,-3.9\\nMnO2,-5.5\\nMn2O3,-9.9",["Zn","O"],["Mn"]); S.dopPhases=pr.dopList; S.phases=pr.list;');
+ assert.equal(r('pr.errs.length'),0); assert.equal(r('S.phases.length'),0); assert.equal(r('S.dopPhases.length'),3);
+ // O-rich: Δμ_O = 0 → MnO2 limits, Δμ_Mn = ΔHf(MnO2) − 2Δμ_O
+ near(r('dopantState("Mn",{Zn:-3.5,O:0}).v'),-5.5); assert.equal(r('dopantState("Mn",{Zn:-3.5,O:0}).src'),'MnO2');
+ // O-poor: Δμ_O = −3.5 → MnO limits: −3.9 + 3.5
+ near(r('dopantState("Mn",{Zn:0,O:-3.5}).v'),-.4); assert.equal(r('dopantState("Mn",{Zn:0,O:-3.5}).src'),'MnO');
+ // Linear in Δμ_O along MnO2: forcing MnO2 at O-poor exceeds the MnO and Mn-metal limits
+ r('S.dopSet={Mn:{mode:"phase",phase:"MnO2"}}');
+ near(r('dopantState("Mn",{Zn:0,O:-3.5}).v'),1.5);
+ assert.deepEqual([...r('dopantState("Mn",{Zn:0,O:-3.5}).viol.map(l=>l.name).sort()')],['Mn elemental limit','Mn2O3','MnO']);
+ r('S.dopSet={Mn:{mode:"fixed",value:-2}}'); near(r('dopantState("Mn",{Zn:0,O:-3.5}).v'),-2); assert.equal(r('dopantState("Mn",{Zn:0,O:-3.5}).viol.length'),0);
+ // No compounds given: only the elemental limit
+ r('S.dopSet={}; S.dopPhases=[]'); near(r('dopantState("Mn",{Zn:0,O:-3.5}).v'),0);
+});
+test('ternary dopant phases include every host element they contain',()=>{
+ const r=engine(); host(r,'ZnO',-3.5);
+ r('S.dopants=["Mn"]; S.dopSet={}; S.dopPhases=loadPhases("phase,dHf\\nZnMn2O4,-12",["Zn","O"],["Mn"]).dopList;');
+ // Δμ_Mn ≤ (−12 − Δμ_Zn − 4Δμ_O)/2
+ near(r('dopantState("Mn",{Zn:-1,O:-2.5}).v'),(-12+1+10)/2);
+});
+test('substitutional dopant formation energy uses dopant reference and Δμ',()=>{
+ const r=engine(); host(r,'ZnO',-3.5);
+ r('S.bulk=-100; S.vbm=1; S.muRef={Zn:-1,O:-4,Mn:-9}; S.dopants=["Mn"]; S.dopSet={}; S.dopPhases=[{name:"MnO",comp:{Mn:1,O:1},dHf:-3.9,dop:"Mn"}]; S.dmu={Zn:-1.5,O:-2};');
+ // Δμ_Mn = −3.9 + 2 = −1.9; Ef = −107 + 100 + 0.1 + 1·(1 + 0.5) + (−1 − 1.5) − (−9 − 1.9)
+ near(r('ef({Etot:-107,Ecorr:.1,q:1,dn:{Zn:-1,O:0,Mn:1}},.5)'),-107+100+.1+1.5+(-2.5)-(-10.9));
+ // condition-dependent: at another host Δμ the dopant limit is recomputed
+ near(r('ef({Etot:-107,Ecorr:0,q:0,dn:{Zn:-1,O:0,Mn:1}},0,{Zn:-3.5,O:0})'),-7+(-4.5)-(-9-3.9));
+});
+test('dopant columns: declared dopants optional, undeclared rejected, multi-dopant phases rejected',()=>{
+ const r=engine();
+ const d=r('loadDefects("defect,charge,E_tot,Zn,O,Mn\\nMn_Zn,0,-1,-1,0,1\\nV_O,0,-2,0,-1,0",["Zn","O"],["Mn"])');
+ assert.equal(d.errs.length,0); assert.equal(d.list[0].dn.Mn,1); assert.equal(d.list[1].dn.Mn,0);
+ const d2=r('loadDefects("defect,charge,E_tot,Zn,O\\nV_O,0,-2,0,-1",["Zn","O"],["Mn"])');
+ assert.equal(d2.errs.length,0); assert.equal(d2.list[0].dn.Mn,0);
+ assert.match(r('loadDefects("defect,charge,E_tot,Zn,O,Cr\\nX,0,-1,-1,0,1",["Zn","O"],["Mn"]).errs[0]'),/Extrinsic dopants/);
+ assert.match(r('loadPhases("phase,dHf\\nMnCr2O4,-15",["Zn","O"],["Mn","Cr"]).errs[0]'),/more than one dopant/);
+ assert.match(r('loadPhases("phase,dHf\\nMnO,-3.9",["Zn","O"]).errs[0]'),/outside the host/);
+ assert.throws(()=>r('parseDopants("Zn",["Zn","O"])'),/host element/);
+ assert.throws(()=>r('parseDopants("Xx",["Zn","O"])'),/not an element/);
+ assert.deepEqual([...r('parseDopants(" Mn, Cr;Co ",["Zn","O"])')],['Mn','Cr','Co']);
+});
+test('publication labels: line-end labels sit outside the frame, charge labels do not overlap',()=>{
+ const r=engine(); host(r,'CuInSe2',-2.37);
+ r('S.bulk=DEMO.bulk; S.vbm=DEMO.vbm; S.gap=DEMO.gap; S.muRef=DEMO.muRef; S.dopants=[]; S.defects=loadDefects(DEMO.defects,S.elements).list; S.fig.n=2; S.fig.width=7; S.fig.labelMode="end"; S.fig.cl=true;');
+ const m=r('var M=publicationModel(); M');
+ for(const P of m.panels){
+  assert.ok(P.ends.length>0);
+  for(const q of P.ends){ assert.ok(q.x>=P.X0+m.pw); assert.ok(q.x+r(`richWidth(${JSON.stringify(q.t)},M.endFs)`)<=P.X0+m.pw+m.labW+1e-6); }
+  for(let i=0;i<P.charges.length;i++) for(let j=i+1;j<P.charges.length;j++){
+   const a=P.charges[i],b=P.charges[j];
+   assert.ok(Math.abs(a.x-b.x)>=m.fs*1.9 || Math.abs(a.y-b.y)>=m.fs*1.05);
+  }
+ }
+ assert.ok(m.panels[1].X0>=m.panels[0].X0+m.pw+m.labW);
+ assert.doesNotMatch(r('buildFigureAGR()'),/NaN|Infinity/);
+ assert.doesNotMatch(r('buildFigureSVG()'),/NaN|Infinity/);
+});
