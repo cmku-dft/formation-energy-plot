@@ -115,6 +115,40 @@ const numOr = (v, d) => {
   const x = Number(t); return Number.isFinite(x) ? x : d;
 };
 
+/* Δn from standard defect notation. Each part is X_Y: X is the added atom
+   (or V / Vac for a vacancy) and Y the site (an element, or i / int for an
+   interstitial). Complexes join parts with + or -. Text in (), [] or {} and
+   charge marks such as ^2+ are ignored, so V_O(split) and V_O^{2+} work.
+   Returns {dn, unknown, ambiguous} or null when the name is not in this
+   notation. "V_X" is ambiguous when vanadium is part of the system. */
+function parseDefectName(name, species = []){
+  const core = String(name).replace(/\([^)]*\)|\[[^\]]*\]|\{[^}]*\}/g, "")
+    .replace(/\^[0-9+\-−]*/g, "").replace(/\s+/g, "");
+  if(!core) return null;
+  const dn = {};
+  let ambiguous = false;
+  for(const part of core.split(/[+\-–]/)){
+    const m = part.match(/^(Vac|[A-Z][a-z]?|v)_([A-Z][a-z]?|int|i)$/);
+    if(!m) return null;
+    const [, a, b] = m;
+    const vac = a === "V" || a === "Vac" || a === "v";
+    const inter = b === "i" || b === "int";
+    if(a === "V" && species.includes("V")) ambiguous = true;
+    if(vac && inter) return null;
+    if(!vac && !ELEMENTS.has(a)) return null;
+    if(!inter && !ELEMENTS.has(b)) return null;
+    if(a === b) return null;
+    if(!vac) dn[a] = (dn[a] || 0) + 1;
+    if(!inter) dn[b] = (dn[b] || 0) - 1;
+  }
+  const unknown = Object.keys(dn).filter(el => dn[el] && !species.includes(el));
+  return {dn, unknown, ambiguous};
+}
+function fmtDn(dn){
+  const parts = Object.entries(dn).filter(([, n]) => n).map(([el, n]) => `${el} ${n > 0 ? "+" : "−"}${Math.abs(n)}`);
+  return parts.length ? parts.join(", ") : "no change";
+}
+
 function loadDefects(text, elements, dopants = []){
   const {head, rows, rawHead} = parseTable(text);
   const iName = head.findIndex(h => ["defect","name","label"].includes(h));
@@ -125,21 +159,26 @@ function loadDefects(text, elements, dopants = []){
   if(iName < 0) errs.push("no 'defect' column");
   if(iQ < 0) errs.push("no 'charge' column");
   if(iE < 0) errs.push("no 'E_tot' column");
-  const elCol = {};
-  for(const el of elements){
-    const j = rawHead.findIndex(h => h === el);
-    if(j >= 0) elCol[el] = j;
-    else errs.push(`missing '${el}' atom-count column (use 0 if unchanged)`);
-  }
-  // Dopant columns are optional (a missing column means no dopant atoms in that defect).
-  for(const el of dopants){
-    const j = rawHead.findIndex(h => h === el);
-    if(j >= 0) elCol[el] = j;
-  }
-  for(const col of rawHead) if(ELEMENTS.has(col) && !elements.includes(col) && !dopants.includes(col))
-    errs.push(`Column '${col}' is not a host element. Declare it under Extrinsic dopants to use it.`);
-  if(errs.length) return {list:[], errs};
+  // Column mode: element columns given; they are used and cross-checked against
+  // the names. Name mode: no element columns; Δn comes from the names.
   const species = [...elements, ...dopants];
+  const colMode = rawHead.some(h => ELEMENTS.has(h));
+  const elCol = {};
+  if(colMode){
+    for(const el of elements){
+      const j = rawHead.findIndex(h => h === el);
+      if(j >= 0) elCol[el] = j;
+      else errs.push(`missing '${el}' atom-count column (use 0 if unchanged, or remove all element columns to read Δn from the defect names)`);
+    }
+    // Dopant columns are optional (a missing column means no dopant atoms in that defect).
+    for(const el of dopants){
+      const j = rawHead.findIndex(h => h === el);
+      if(j >= 0) elCol[el] = j;
+    }
+    for(const col of rawHead) if(ELEMENTS.has(col) && !species.includes(col))
+      errs.push(`Column '${col}' is not a host element. Declare it under Extrinsic dopants to use it.`);
+  }
+  if(errs.length) return {list:[], errs};
   const list = [];
   rows.forEach((r, n) => {
     const nm = r[iName];
@@ -149,8 +188,31 @@ function loadDefects(text, elements, dopants = []){
     if(!Number.isInteger(q) || !Number.isFinite(E)){
       errs.push(`row ${n+2}: charge must be an integer and E_tot must be a finite number`); return;
     }
+    const parsed = parseDefectName(nm, species);
+    if(parsed && parsed.unknown.length){
+      errs.push(`row ${n+2}: ${nm} contains ${parsed.unknown.join(", ")}, which is not a host element. Add it under Extrinsic dopants.`); return;
+    }
     const dn = {};
-    for(const el of species) dn[el] = elCol[el] === undefined ? 0 : numOr(r[elCol[el]], NaN);
+    let dnSource;
+    if(colMode){
+      for(const el of species) dn[el] = elCol[el] === undefined ? 0 : numOr(r[elCol[el]], NaN);
+      dnSource = "columns";
+      if(parsed && !parsed.ambiguous && Object.values(dn).every(Number.isInteger)){
+        if(species.some(el => (parsed.dn[el] || 0) !== dn[el])){
+          errs.push(`row ${n+2}: ${nm} means ${fmtDn(parsed.dn)}, but the element columns give ${fmtDn(dn)}. Fix the columns or rename the defect (text in parentheses is ignored).`); return;
+        }
+        dnSource = "columns, match name";
+      }
+    } else {
+      if(!parsed){
+        errs.push(`row ${n+2}: cannot read Δn from the name '${nm}'. Use notation such as V_O, Zn_i, Al_Zn or Al_Zn+V_Zn, or add element columns.`); return;
+      }
+      if(parsed.ambiguous){
+        errs.push(`row ${n+2}: in '${nm}', V could mean a vacancy or vanadium. Write the vacancy as Vac_X, or add element columns.`); return;
+      }
+      for(const el of species) dn[el] = parsed.dn[el] || 0;
+      dnSource = "name";
+    }
     const Ecorr = iC >= 0 ? numOr(r[iC], NaN) : 0;
     if(!Number.isFinite(Ecorr) || !Object.values(dn).every(Number.isInteger)){
       errs.push(`row ${n+2}: E_corr must be numeric and atom counts must be integers`); return;
@@ -160,7 +222,7 @@ function loadDefects(text, elements, dopants = []){
       errs.push(`row ${n+2}: all charge states of ${nm} must have the same atom counts`); return;
     }
     if(list.filter(d => d.name === nm).length >= 100){ errs.push(`${nm}: limit 100 entries per defect`); return; }
-    list.push({name:nm, q, Etot:E, Ecorr, dn});
+    list.push({name:nm, q, Etot:E, Ecorr, dn, dnSource});
   });
   return {list, errs};
 }
@@ -445,8 +507,8 @@ function renderRegion(){
   const svg = document.getElementById("svg-region");
   const box = document.getElementById("cb-region");
   const W = Math.max(280, box.clientWidth || 420);
-  const H = Math.max(240, Math.min(360, W*0.78));
-  const m = {t:14, r:16, b:40, l:52};
+  const H = Math.max(260, Math.min(400, W*0.8));
+  const m = {t:16, r:18, b:48, l:60};
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
@@ -469,12 +531,12 @@ function renderRegion(){
   const xt = niceTicks(x0, x1, 5), yt = niceTicks(y0, y1, 5);
   for(const t of xt) g += `<line x1="${SX(t)}" y1="${m.t}" x2="${SX(t)}" y2="${m.t+ih}" stroke="${grid}" stroke-width="1"/>`;
   for(const t of yt) g += `<line x1="${m.l}" y1="${SY(t)}" x2="${m.l+iw}" y2="${SY(t)}" stroke="${grid}" stroke-width="1"/>`;
-  for(const t of xt) g += `<text x="${SX(t)}" y="${m.t+ih+15}" fill="${ink3}" font-size="10" font-family="${css('--mono')||'monospace'}" text-anchor="middle">${t}</text>`;
-  for(const t of yt) g += `<text x="${m.l-7}" y="${SY(t)+3.5}" fill="${ink3}" font-size="10" font-family="monospace" text-anchor="end">${t}</text>`;
+  for(const t of xt) g += `<text x="${SX(t)}" y="${m.t+ih+18}" fill="${ink3}" font-size="12.5" font-family="${css('--mono')||'monospace'}" text-anchor="middle">${t}</text>`;
+  for(const t of yt) g += `<text x="${m.l-8}" y="${SY(t)+4.5}" fill="${ink3}" font-size="12.5" font-family="monospace" text-anchor="end">${t}</text>`;
   g += `<line x1="${m.l}" y1="${m.t+ih}" x2="${m.l+iw}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
   g += `<line x1="${m.l}" y1="${m.t}" x2="${m.l}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
-  g += `<text x="${m.l+iw/2}" y="${H-6}" fill="${ink2}" font-size="11" text-anchor="middle">Δμ(${S.axX}) — eV</text>`;
-  g += `<text transform="translate(12,${m.t+ih/2}) rotate(-90)" fill="${ink2}" font-size="11" text-anchor="middle">Δμ(${S.axY}) — eV</text>`;
+  g += `<text x="${m.l+iw/2}" y="${H-7}" fill="${ink2}" font-size="13.5" text-anchor="middle">Δμ(${S.axX}) — eV</text>`;
+  g += `<text transform="translate(15,${m.t+ih/2}) rotate(-90)" fill="${ink2}" font-size="13.5" text-anchor="middle">Δμ(${S.axY}) — eV</text>`;
 
   if(pts.length >= 3){
     const h = hull2(pts);
@@ -486,9 +548,9 @@ function renderRegion(){
 
   pts.forEach((p, i) => {
     const sel = i === S.selVtx;
-    g += `<circle class="vdot" data-i="${i}" cx="${SX(p[0])}" cy="${SY(p[1])}" r="${sel?6:4.5}"
+    g += `<circle class="vdot" data-i="${i}" cx="${SX(p[0])}" cy="${SY(p[1])}" r="${sel?7:5.5}"
            fill="${sel?acc:surf}" stroke="${acc}" stroke-width="2" style="cursor:pointer"/>`;
-    g += `<text x="${SX(p[0])+9}" y="${SY(p[1])-7}" fill="${ink}" font-size="10.5" font-weight="600" font-family="monospace">${String.fromCharCode(65+i)}</text>`;
+    g += `<text x="${SX(p[0])+9}" y="${SY(p[1])-7}" fill="${ink}" font-size="13" font-weight="600" font-family="monospace">${String.fromCharCode(65+i)}</text>`;
   });
 
   // current condition crosshair (when it is not exactly a vertex)
@@ -525,8 +587,8 @@ function renderMain(){
   const W = Math.max(300, box.clientWidth || 860);
   const narrow = W < 560;
   const H = Math.max(320, Math.min(560, W*(narrow ? 0.85 : 0.56)));
-  const labelRoom = S.showLbl && !narrow ? 86 : 16;
-  const m = {t:18, r:labelRoom, b:46, l:56};
+  const labelRoom = S.showLbl && !narrow ? 104 : 18;
+  const m = {t:22, r:labelRoom, b:54, l:64};
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
@@ -573,15 +635,15 @@ function renderMain(){
   // band edges
   g += `<line x1="${SX(0)}" y1="${m.t}" x2="${SX(0)}" y2="${m.t+ih}" stroke="${ink3}" stroke-width="1.5"/>`;
   g += `<line x1="${SX(gap)}" y1="${m.t}" x2="${SX(gap)}" y2="${m.t+ih}" stroke="${ink3}" stroke-width="1.5"/>`;
-  g += `<text x="${SX(0)+5}" y="${m.t+11}" fill="${ink3}" font-size="10" font-family="monospace" letter-spacing="0.5">VBM</text>`;
-  g += `<text x="${SX(gap)-5}" y="${m.t+11}" fill="${ink3}" font-size="10" font-family="monospace" letter-spacing="0.5" text-anchor="end">CBM</text>`;
+  g += `<text x="${SX(0)+5}" y="${m.t+14}" fill="${ink3}" font-size="12.5" font-family="monospace" letter-spacing="0.5">VBM</text>`;
+  g += `<text x="${SX(gap)-5}" y="${m.t+14}" fill="${ink3}" font-size="12.5" font-family="monospace" letter-spacing="0.5" text-anchor="end">CBM</text>`;
 
-  for(const t of yt) g += `<text x="${m.l-8}" y="${SY(t)+3.5}" fill="${ink3}" font-size="10.5" font-family="monospace" text-anchor="end">${t}</text>`;
-  for(const t of xt) g += `<text x="${SX(t)}" y="${m.t+ih+16}" fill="${ink3}" font-size="10.5" font-family="monospace" text-anchor="middle">${t}</text>`;
+  for(const t of yt) g += `<text x="${m.l-9}" y="${SY(t)+4.5}" fill="${ink3}" font-size="13" font-family="monospace" text-anchor="end">${t}</text>`;
+  for(const t of xt) g += `<text x="${SX(t)}" y="${m.t+ih+19}" fill="${ink3}" font-size="13" font-family="monospace" text-anchor="middle">${t}</text>`;
   g += `<line x1="${m.l}" y1="${m.t+ih}" x2="${m.l+iw}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
   g += `<line x1="${m.l}" y1="${m.t}" x2="${m.l}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
-  g += `<text x="${m.l+iw/2}" y="${H-8}" fill="${ink2}" font-size="11.5" text-anchor="middle">Fermi level above VBM — eV</text>`;
-  g += `<text transform="translate(13,${m.t+ih/2}) rotate(-90)" fill="${ink2}" font-size="11.5" text-anchor="middle">Formation energy — eV</text>`;
+  g += `<text x="${m.l+iw/2}" y="${H-9}" fill="${ink2}" font-size="14" text-anchor="middle">Fermi level above VBM — eV</text>`;
+  g += `<text transform="translate(16,${m.t+ih/2}) rotate(-90)" fill="${ink2}" font-size="14" text-anchor="middle">Formation energy — eV</text>`;
 
   // faint all-charge-state lines behind the envelopes
   if(S.showAll){
@@ -601,7 +663,7 @@ function renderMain(){
     });
     if(pts.length){
       g += `<polyline points="${pts.map(p => p.join(",")).join(" ")}" fill="none"
-             stroke="${d.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+             stroke="${d.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"
              ${d.dash ? `stroke-dasharray="${d.dash}"` : ""}/>`;
     }
     // transition-level markers: 2px surface ring
@@ -612,9 +674,9 @@ function renderMain(){
     if(S.showLbl) for(const s of d.segs){
       const w = SX(s.x1) - SX(s.x0);
       if(w < 42) continue;
-      const spot = labelSpot(s, SX, SY, placed, {w:22, h:12, above:7, below:15, top:m.t+10, bottom:m.t+ih-2});
+      const spot = labelSpot(s, SX, SY, placed, {w:26, h:15, above:8, below:18, top:m.t+12, bottom:m.t+ih-2});
       if(!spot) continue;
-      g += `<text x="${spot[0]}" y="${spot[1]}" fill="${d.color}" font-size="10" font-weight="600"
+      g += `<text x="${spot[0]}" y="${spot[1]}" fill="${d.color}" font-size="12.5" font-weight="600"
              font-family="monospace" text-anchor="middle"
              paint-order="stroke" stroke="${surf}" stroke-width="3"
              stroke-linejoin="round">${sgn(s.q)}</text>`;
@@ -627,7 +689,7 @@ function renderMain(){
       const s = d.segs[d.segs.length-1];
       return {name:d.name, color:d.color, y:SY(s.A + s.q*s.x1)};
     }).sort((a, b) => a.y - b.y);
-    const MIN = 13;
+    const MIN = 16;
     for(let i = 1; i < lab.length; i++)
       if(lab[i].y - lab[i-1].y < MIN) lab[i].y = lab[i-1].y + MIN;
     if(lab.length){
@@ -637,7 +699,7 @@ function renderMain(){
     }
     for(const L of lab){
       g += `<line x1="${m.l+iw+2}" y1="${L.y}" x2="${m.l+iw+8}" y2="${L.y}" stroke="${L.color}" stroke-width="2"/>`;
-      g += `<text x="${m.l+iw+11}" y="${L.y+3.5}" fill="${ink}" font-size="10.5" font-family="monospace">${esc(L.name)}</text>`;
+      g += `<text x="${m.l+iw+11}" y="${L.y+3.5}" fill="${ink}" font-size="13" font-family="monospace">${esc(L.name)}</text>`;
     }
   }
 
@@ -701,7 +763,7 @@ function renderChips(){
     : "custom Δμ") + S.dopants.map(el => `; Δμ(${el}) from ${dopantState(el, S.dmu).src}`).join("");
   $("tag-host").textContent = S.elements.join(" ");
   $("tag-def").textContent = `${S.defects.length} rows`;
-  $("tag-ph").textContent = `${S.phases.length} phases`;
+  $("tag-ph").textContent = `${S.phases.length} phases` + (S.dopPhases.length ? ` + ${S.dopPhases.length} dopant` : "");
   $("region-dim").textContent = S.elements.length <= 2
     ? "1-D line segment"
     : S.elements.length === 3 ? "2-D polygon"
@@ -724,10 +786,10 @@ function renderDmuInputs(){
   const p = S.elements[S.pivot];
   $("dmu-inputs").innerHTML = S.elements.map(e => `
     <div class="flexline" style="gap:8px">
-      <span class="lbl" style="width:56px;text-transform:none">Δμ(${e})</span>
+      <span class="lbl" style="width:64px">Δμ(${e})</span>
       <input type="number" step="0.01" id="dmu-${e}" value="${S.dmu[e].toFixed(4)}"
         ${e===p?"disabled":""} style="flex:1" aria-label="Delta mu ${e}">
-      ${e===p?`<span class="muted mono" style="font-size:10px">solved</span>`:""}
+      ${e===p?`<span class="muted" style="font-size:13px">solved</span>`:""}
     </div>`).join("");
   for(const e of S.elements){
     if(e === p) continue;
@@ -779,12 +841,12 @@ function renderDopants(){
       return `<tr${i===S.selVtx?' style="font-weight:600"':""}><td>${String.fromCharCode(65+i)}</td><td class="num">${fx(s.v)}</td><td>${esc(s.src)}</td></tr>`;
     }).join("");
     return `<div class="stack" style="gap:6px">
-      <div class="flexline" style="gap:8px"><span class="lbl" style="width:56px;text-transform:none">Δμ(${esc(el)})</span>
-        <span class="mono" style="flex:1">${fx(st.v,4)}</span><span class="muted mono" style="font-size:10px">${esc(st.src)}</span></div>
+      <div class="flexline" style="gap:8px"><span class="lbl" style="width:64px">Δμ(${esc(el)})</span>
+        <span class="mono" style="flex:1">${fx(st.v,4)}</span><span class="muted" style="font-size:13px">${esc(st.src)}</span></div>
       <select id="dop-mode-${el}" aria-label="How Δμ(${esc(el)}) is set">${opts}</select>
       ${st.mode==="fixed" ? `<input type="number" step="0.01" id="dop-val-${el}" value="${st.v.toFixed(4)}" aria-label="Fixed Δμ ${esc(el)}">` : ""}
       ${notes}
-      ${S.verts.length ? `<div class="tbl-wrap"><table><thead><tr><th>Vertex</th><th class="num"><span class="nt">Δμ(${esc(el)})</span></th><th>set by</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
+      ${S.verts.length ? `<div class="tbl-wrap"><table><thead><tr><th>Vertex</th><th class="num">Δμ(${esc(el)})</th><th>set by</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
     </div>`;
   }).join("");
   for(const el of S.dopants){
@@ -801,6 +863,17 @@ function renderDopants(){
       if(Number.isFinite(v) && v !== S.dopSet[el]?.value){ S.dopSet[el] = {mode:"fixed", value:v}; draw(); }
     });
   }
+}
+
+function renderDnSummary(){
+  const seen = new Map();
+  for(const d of S.defects) if(!seen.has(d.name)) seen.set(d.name, d);
+  const label = {"name":"from name", "columns, match name":"columns ✓ name", "columns":"columns (name not in standard notation)"};
+  $("dn-summary").innerHTML = seen.size
+    ? `<div class="lbl" style="margin-bottom:4px">Δn used</div>` +
+      [...seen.values()].map(d => `<div class="mono" style="font-size:13.5px">${esc(d.name)}: ${esc(fmtDn(d.dn))} <span class="muted">· ${esc(label[d.dnSource] || d.dnSource)}</span></div>`).join("")
+    : "";
+  $("dn-summary").hidden = !seen.size;
 }
 
 function renderLegend(){
@@ -874,7 +947,7 @@ function pickVertex(i){
 }
 function draw(){
   if(!S.valid) return;
-  renderChips(); renderVertexList(); renderDmuInputs(); renderFeas(); renderDopants();
+  renderChips(); renderVertexList(); renderDmuInputs(); renderFeas(); renderDopants(); renderDnSummary();
   renderRegion(); renderMsgs();
   if(S.defectReady === false){
     for(const id of ["legend","svg-main","fig-prev","cond-rows","fig-series"]) $(id).innerHTML = "";
@@ -887,6 +960,9 @@ function draw(){
 }
 
 function readSystem(){
+  // Show the raw-energy help and the per-cell count only when they apply.
+  $("note-raw").hidden = $("host-type").value !== "total";
+  $("units-field").hidden = $("host-basis").value !== "cell";
   S.hostFormula = $("f-host").value.trim();
   const hc = parseFormula(S.hostFormula);
   if(!hc) throw Error("Enter a valid host formula, such as ZnO, In2O3 or CuInSe2.");
@@ -957,7 +1033,8 @@ const EXPORT_IDS = ["b-svg", "b-tsv", "b-png", "b-png6", "b-svgdl", "b-agr", "b-
 function invalidate(message){
   S.valid = false;
   $("input-status").innerHTML = `<div class="note bad"><b>Inputs need attention.</b> ${esc(message)} Results are cleared until the inputs are corrected.</div>`;
-  for(const id of ["chips","vtx-list","dmu-inputs","feas","dop-panel","legend","svg-region","svg-main","fig-prev","cond-rows","fig-series","main-msg"]) $(id).innerHTML = "";
+  $("dn-summary").hidden = true;
+  for(const id of ["chips","vtx-list","dmu-inputs","feas","dop-panel","dn-summary","legend","svg-region","svg-main","fig-prev","cond-rows","fig-series","main-msg"]) $(id).innerHTML = "";
   for(const id of ["tbl-lv","tbl-edge"]) $(id).querySelector("tbody").innerHTML = "";
   $("region-dim").textContent = "Calculation paused";
   $("cond-tag").textContent = "";
@@ -1556,7 +1633,7 @@ function renderSeriesRows(){
     return `<tr>
       <td><input type="checkbox" id="sv${i}" ${st.vis?"checked":""} aria-label="show ${esc(nm)}"></td>
       <td><input type="color" id="sc${i}" value="${st.color}" aria-label="color ${esc(nm)}"></td>
-      <td class="muted" style="font-size:11.5px">${esc(nm)}</td>
+      <td class="muted" style="font-size:13.5px">${esc(nm)}</td>
       <td style="width:100%"><input type="text" id="sl${i}" value="${esc(st.label)}" aria-label="label ${esc(nm)}"></td>
     </tr>`;
   }).join("") || `<tr><td class="muted">No defects loaded.</td></tr>`;
@@ -1766,26 +1843,44 @@ $("u-inputs").addEventListener("change", async e => {
       e.target.value='';
       return;
     }
-    if(data.format !== "defect-formation-explorer" || data.version !== 1 ||
-      !INPUT_IDS.every(id=>typeof data.inputs?.[id] === "string")) throw Error("Choose an input file saved by this app.");
-    const comp=parseFormula(data.inputs["f-host"]);
-    if(!comp) throw Error("Invalid host formula.");
-    INPUT_IDS.forEach(id=>$(id).value=data.inputs[id]);
-    $('host-type').value=data.hostEnergy?.type||'formation';$('host-basis').value=data.hostEnergy?.basis||'formula';$('host-units').value=data.hostEnergy?.units||1;
-    $("f-dop").value = typeof data.dopants === "string" ? data.dopants : "";
-    S.dopSet = data.dopantSettings && typeof data.dopantSettings === "object" ? JSON.parse(JSON.stringify(data.dopantSettings)) : {};
-    S.elements=[]; S.dopants=[]; S.muRef=Object.fromEntries(Object.entries(data.references || {}).map(([el,v])=>[el,numOr(v,NaN)]));
-    S.selVtx=0; S.hidden.clear(); S.fig.condsTouched=false;
-    recompute();
-    if(S.valid && S.elements.every(el=>Number.isFinite(data.dmu?.[el]))){
-      const f=feasibility(data.dmu);
-      if(Math.abs(f.hostResid)<1e-6){ S.dmu={...data.dmu}; S.selVtx=S.verts.findIndex(v=>S.elements.every(el=>Math.abs(v.dmu[el]-S.dmu[el])<1e-6)); draw(); }
-    }
+    applySavedInputs(data);
     $("src-tag").textContent="saved inputs";
     $("data-notice").textContent="User-supplied data. Results depend on your energy references and included phases. Save inputs to keep a local copy; figure styling is not included.";
   } catch(err){ $("input-status").textContent=`Could not open inputs: ${err.message}`; }
   e.target.value="";
 });
+// Restore a file written by "Save inputs" (also used by the bundled examples).
+function applySavedInputs(data){
+  if(data.format !== "defect-formation-explorer" || data.version !== 1 ||
+    !INPUT_IDS.every(id=>typeof data.inputs?.[id] === "string")) throw Error("Choose an input file saved by this app.");
+  const comp=parseFormula(data.inputs["f-host"]);
+  if(!comp) throw Error("Invalid host formula.");
+  INPUT_IDS.forEach(id=>$(id).value=data.inputs[id]);
+  $('host-type').value=data.hostEnergy?.type||'formation';$('host-basis').value=data.hostEnergy?.basis||'formula';$('host-units').value=data.hostEnergy?.units||1;
+  $("f-dop").value = typeof data.dopants === "string" ? data.dopants : "";
+  S.dopSet = data.dopantSettings && typeof data.dopantSettings === "object" ? JSON.parse(JSON.stringify(data.dopantSettings)) : {};
+  S.elements=[]; S.dopants=[]; S.muRef=Object.fromEntries(Object.entries(data.references || {}).map(([el,v])=>[el,numOr(v,NaN)]));
+  S.selVtx=0; S.hidden.clear(); S.fig.condsTouched=false;
+  recompute();
+  if(S.valid && S.elements.every(el=>Number.isFinite(data.dmu?.[el]))){
+    const f=feasibility(data.dmu);
+    if(Math.abs(f.hostResid)<1e-6){ S.dmu={...data.dmu}; S.selVtx=S.verts.findIndex(v=>S.elements.every(el=>Math.abs(v.dmu[el]-S.dmu[el])<1e-6)); draw(); }
+  }
+}
+// Bundled examples in examples/ (illustrative numbers, saved-inputs format).
+async function loadExample(file, label){
+  try {
+    const res = await fetch(`examples/${file}`, {cache:"no-cache"});
+    if(!res.ok) throw Error(`HTTP ${res.status}`);
+    applySavedInputs(await res.json());
+    $("src-tag").textContent = label;
+    $("data-notice").textContent = `${label}: illustrative numbers that show the input format, not results from a real calculation. Replace them with your own consistent DFT energies.`;
+  } catch(err){
+    $("input-status").innerHTML = `<div class="note bad">Could not load the example (${esc(err.message)}). Examples need the app to be served over http(s); you can also open the file from the examples folder with Open inputs.</div>`;
+  }
+}
+$("b-ex-zno").addEventListener("click", () => loadExample("ZnO_native_defects.json", "ZnO native-defect example"));
+$("b-ex-znoal").addEventListener("click", () => loadExample("ZnO_Al_doped.json", "ZnO:Al example"));
 for(const id of [...INPUT_IDS,"f-dop","muref-grid"]){
   $(id).addEventListener("input", () => {
     $("src-tag").textContent="your data";

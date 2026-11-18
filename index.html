@@ -32,8 +32,8 @@
   --surface-2:#f7f9fa;
   --sunk:#eaeef0;
   --ink:#0e1519;
-  --ink-2:#4b5760;
-  --ink-3:#7d8a93;
+  --ink-2:#3f4a52;
+  --ink-3:#5b6870;
   --line:#dbe2e6;
   --line-2:#c6d0d6;
   --accent:#1c5cab;
@@ -58,7 +58,7 @@
     --sunk:#12171a;
     --ink:#eef3f5;
     --ink-2:#a6b2ba;
-    --ink-3:#74818a;
+    --ink-3:#8c98a1;
     --line:#2a3237;
     --line-2:#39434a;
     --accent:#3987e5;
@@ -80,7 +80,7 @@
   --sunk:#12171a;
   --ink:#eef3f5;
   --ink-2:#a6b2ba;
-  --ink-3:#74818a;
+  --ink-3:#8c98a1;
   --line:#2a3237;
   --line-2:#39434a;
   --accent:#3987e5;
@@ -97,7 +97,7 @@
 *{box-sizing:border-box}
 body{
   margin:0; background:var(--bg); color:var(--ink);
-  font-family:var(--sans); font-size:14px; line-height:1.5;
+  font-family:var(--sans); font-size:15.5px; line-height:1.55;
   -webkit-font-smoothing:antialiased;
 }
 h1,h2,h3{margin:0; text-wrap:balance; font-weight:600; letter-spacing:-.011em}
@@ -119,22 +119,22 @@ header.top{
   display:flex; align-items:center; gap:16px; flex-wrap:wrap;
 }
 .brand{display:flex; align-items:baseline; gap:10px; min-width:0}
-.brand h1{font-size:16px; letter-spacing:-.02em}
+.brand h1{font-size:19px; letter-spacing:-.02em}
 .brand .sub{
-  font-family:var(--mono); font-size:10.5px; text-transform:uppercase;
-  letter-spacing:.09em; color:var(--ink-3); white-space:nowrap;
+  font-family:var(--mono); font-size:12px; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--ink-3); white-space:nowrap;
 }
 .chips{display:flex; gap:6px; flex-wrap:wrap; margin-left:auto}
 .chip{
-  font-family:var(--mono); font-size:11px; padding:3px 8px;
+  font-family:var(--mono); font-size:13px; padding:4px 10px;
   background:var(--surface); border:1px solid var(--line); border-radius:999px;
   color:var(--ink-2); white-space:nowrap;
 }
 .chip b{color:var(--ink); font-weight:600}
 
 /* ---------- layout ---------- */
-.grid{display:grid; grid-template-columns:352px minmax(0,1fr); gap:16px; margin-top:16px; align-items:start}
-@media (max-width:1000px){ .grid{grid-template-columns:1fr} }
+.grid{display:grid; grid-template-columns:400px minmax(0,1fr); gap:16px; margin-top:16px; align-items:start}
+@media (max-width:1100px){ .grid{grid-template-columns:1fr} }
 
 .panel{
   background:var(--surface); border:1px solid var(--line);
@@ -142,49 +142,49 @@ header.top{
 }
 .panel-head{
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-  padding:12px 14px; border-bottom:1px solid var(--line);
+  padding:13px 16px; border-bottom:1px solid var(--line);
 }
-.panel-head h2{font-size:13px; letter-spacing:-.005em}
-.panel-head .hint{font-family:var(--mono); font-size:10.5px; color:var(--ink-3); letter-spacing:.02em}
-.panel-body{padding:14px}
+.panel-head h2{font-size:16.5px; letter-spacing:-.008em}
+.panel-head .hint{font-family:var(--mono); font-size:13px; color:var(--ink-3)}
+.panel-body{padding:16px}
 .rail{display:flex; flex-direction:column; gap:16px; position:sticky; top:calc(env(safe-area-inset-top, 0px) + 68px)}
-@media (max-width:1000px){ .rail{position:static} }
+@media (max-width:1100px){ .rail{position:static} }
 .main{display:flex; flex-direction:column; gap:16px; min-width:0}
 
 /* ---------- forms ---------- */
-.field{display:flex; flex-direction:column; gap:4px}
+.field{display:flex; flex-direction:column; gap:5px}
 .field label, .lbl{
-  font-family:var(--mono); font-size:10px; text-transform:uppercase;
-  letter-spacing:.08em; color:var(--ink-3);
+  font-family:var(--sans); font-size:13.5px; font-weight:500; color:var(--ink-2);
 }
 input[type=text], input[type=number], textarea, select{
   width:100%; background:var(--surface-2); border:1px solid var(--line-2);
-  border-radius:6px; padding:6px 8px; font-family:var(--mono); font-size:12.5px;
+  border-radius:6px; padding:8px 10px; font-family:var(--mono); font-size:14.5px;
   font-variant-numeric:tabular-nums;
 }
+select{font-family:var(--sans)}
 input:disabled{background:var(--sunk); color:var(--ink-3)}
 textarea{line-height:1.5; resize:vertical; white-space:pre; overflow-wrap:normal; overflow-x:auto}
-.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px}
-.row3{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
-.stack{display:flex; flex-direction:column; gap:10px}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.row3{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px}
+.stack{display:flex; flex-direction:column; gap:12px}
 
 .btn{
   background:var(--surface-2); border:1px solid var(--line-2); border-radius:6px;
-  padding:5px 11px; font-size:12.5px; font-weight:500; cursor:pointer;
+  padding:8px 14px; font-size:14.5px; font-weight:500; cursor:pointer; min-height:38px;
   transition:background .12s, border-color .12s;
 }
 .btn:hover{background:var(--sunk); border-color:var(--ink-3)}
 .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
 .btn.primary:hover{filter:brightness(1.08)}
-.btn.sm{padding:3px 8px; font-size:11.5px}
+.btn.sm{padding:6px 11px; font-size:13.5px; min-height:34px}
 .btnrow{display:flex; gap:8px; flex-wrap:wrap}
 
 details.sec{border-top:1px solid var(--line)}
 details.sec:first-of-type{border-top:0}
 details.sec > summary{
-  list-style:none; cursor:pointer; padding:11px 14px;
+  list-style:none; cursor:pointer; padding:13px 16px;
   display:flex; align-items:center; gap:8px;
-  font-size:12.5px; font-weight:600;
+  font-size:15px; font-weight:600;
 }
 details.sec > summary::-webkit-details-marker{display:none}
 details.sec > summary::before{
@@ -194,33 +194,33 @@ details.sec > summary::before{
 }
 details.sec[open] > summary::before{transform:rotate(45deg) translate(-1px,-1px)}
 details.sec > summary .tag{
-  margin-left:auto; font-family:var(--mono); font-size:10.5px;
+  margin-left:auto; font-family:var(--mono); font-size:12.5px;
   color:var(--ink-3); font-weight:400;
 }
-details.sec .inner{padding:0 14px 14px}
+details.sec .inner{padding:0 16px 16px}
 
 /* ---------- tables ---------- */
 .tbl-wrap{overflow-x:auto}
-table{border-collapse:collapse; width:100%; font-family:var(--mono); font-size:12px; font-variant-numeric:tabular-nums}
+table{border-collapse:collapse; width:100%; font-family:var(--mono); font-size:14px; font-variant-numeric:tabular-nums}
 th{
-  text-align:left; font-weight:500; font-size:10px; text-transform:uppercase;
-  letter-spacing:.07em; color:var(--ink-3); padding:6px 10px 6px 0;
+  text-align:left; font-family:var(--sans); font-weight:600; font-size:13px;
+  color:var(--ink-2); padding:8px 12px 8px 0;
   border-bottom:1px solid var(--line-2); white-space:nowrap;
 }
-td{padding:6px 10px 6px 0; border-bottom:1px solid var(--grid); white-space:nowrap}
+td{padding:7px 12px 7px 0; border-bottom:1px solid var(--grid); white-space:nowrap}
 tr:last-child td{border-bottom:0}
 td.num, th.num{text-align:right; padding-right:14px}
-.swatch{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:7px; vertical-align:baseline}
+.swatch{display:inline-block; width:11px; height:11px; border-radius:2px; margin-right:7px; vertical-align:baseline}
 
 /* ---------- legend ---------- */
 .legend{display:flex; gap:6px; flex-wrap:wrap}
 .lg{
   display:inline-flex; align-items:center; gap:6px; cursor:pointer;
   border:1px solid var(--line-2); background:var(--surface-2);
-  border-radius:999px; padding:3px 10px 3px 8px;
-  font-family:var(--mono); font-size:11.5px; transition:opacity .12s;
+  border-radius:999px; padding:5px 12px 5px 10px;
+  font-family:var(--mono); font-size:13.5px; transition:opacity .12s;
 }
-.lg .dot{width:8px; height:8px; border-radius:2px}
+.lg .dot{width:10px; height:10px; border-radius:2px}
 .lg.off{opacity:.38}
 .lg:hover{border-color:var(--ink-3)}
 
@@ -231,26 +231,26 @@ td.num, th.num{text-align:right; padding-right:14px}
   position:absolute; pointer-events:none; z-index:20; opacity:0;
   transition:opacity .09s; transform:translate(-50%,-100%);
   background:var(--surface); border:1px solid var(--line-2); border-radius:7px;
-  box-shadow:var(--shadow); padding:8px 10px; min-width:150px;
-  font-family:var(--mono); font-size:11.5px; font-variant-numeric:tabular-nums;
+  box-shadow:var(--shadow); padding:9px 12px; min-width:170px;
+  font-family:var(--mono); font-size:13.5px; font-variant-numeric:tabular-nums;
 }
 .tip.on{opacity:1}
-.tip .th{font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-3); margin-bottom:5px}
+.tip .th{font-family:var(--sans); font-size:13px; font-weight:600; color:var(--ink-2); margin-bottom:5px}
 .tip .tr{display:flex; align-items:center; gap:7px; justify-content:space-between; padding:1px 0}
 .tip .tr .nm{display:flex; align-items:center; gap:6px}
 .tip .tr .dot{width:7px; height:7px; border-radius:2px; flex:none}
 
 /* ---------- notes / status ---------- */
 .note{
-  font-size:12px; color:var(--ink-2); background:var(--surface-2);
-  border:1px solid var(--line); border-left:2px solid var(--line-2);
-  border-radius:0 6px 6px 0; padding:8px 11px;
+  font-size:14px; line-height:1.55; color:var(--ink-2); background:var(--surface-2);
+  border:1px solid var(--line); border-left:3px solid var(--line-2);
+  border-radius:0 6px 6px 0; padding:10px 13px;
 }
 .note.warn{background:var(--warn-soft); border-left-color:var(--warn); color:var(--ink)}
 .note.bad{background:var(--warn-soft); border-left-color:var(--bad); color:var(--ink)}
 .note code, code{font-family:var(--mono); font-size:.92em; background:var(--sunk); padding:1px 4px; border-radius:3px}
 .eq{
-  font-family:var(--serif); font-size:14px; line-height:2.05; color:var(--ink);
+  font-family:var(--serif); font-size:17px; line-height:2.05; color:var(--ink);
   background:var(--surface-2); border:1px solid var(--line); border-radius:8px;
   padding:12px 14px;
 }
@@ -262,19 +262,19 @@ th .nt{text-transform:none; letter-spacing:0}
 .vtx-btn{
   display:flex; align-items:center; gap:8px; width:100%; text-align:left;
   border:1px solid var(--line-2); background:var(--surface-2); border-radius:6px;
-  padding:6px 9px; cursor:pointer; font-family:var(--mono); font-size:11.5px;
+  padding:8px 11px; cursor:pointer; font-family:var(--sans); font-size:14px;
   font-variant-numeric:tabular-nums; transition:background .12s, border-color .12s;
 }
 .vtx-btn:hover{border-color:var(--ink-3)}
 .vtx-btn.sel{background:var(--accent-soft); border-color:var(--accent)}
 .vtx-btn .id{
-  width:18px; height:18px; flex:none; border-radius:4px; display:grid; place-items:center;
-  background:var(--sunk); font-size:10.5px; font-weight:600;
+  width:22px; height:22px; flex:none; border-radius:4px; display:grid; place-items:center;
+  background:var(--sunk); font-size:12.5px; font-weight:600;
 }
 .vtx-btn.sel .id{background:var(--accent); color:#fff}
-.vtx-list{display:flex; flex-direction:column; gap:5px; max-height:250px; overflow-y:auto}
-.region-grid{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:18px}
-@media (max-width:820px){ .region-grid{grid-template-columns:1fr} }
+.vtx-list{display:flex; flex-direction:column; gap:6px; max-height:300px; overflow-y:auto}
+.region-grid{display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:20px}
+@media (max-width:900px){ .region-grid{grid-template-columns:1fr} }
 
 /* ---------- publication figure ---------- */
 .figstage{
@@ -282,30 +282,30 @@ th .nt{text-transform:none; letter-spacing:0}
   padding:18px; display:flex; justify-content:center; overflow-x:auto;
 }
 .figstage svg{max-width:100%; height:auto; display:block}
-.figctl{display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:10px 12px}
-.figctl .field input, .figctl .field select{padding:4px 6px; font-size:12px}
-.figgroup{border:1px solid var(--line); border-radius:8px; padding:11px 12px; background:var(--surface-2)}
-.figgroup > .lbl{display:block; margin-bottom:9px}
-.condrow{display:grid; grid-template-columns:22px minmax(0,1fr) minmax(0,1.2fr); gap:8px; align-items:center}
+.figctl{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px 14px}
+.figctl .field input, .figctl .field select{padding:7px 9px; font-size:14px}
+.figgroup{border:1px solid var(--line); border-radius:8px; padding:14px; background:var(--surface-2)}
+.figgroup > .lbl{display:block; margin-bottom:10px; font-size:14.5px; font-weight:600; color:var(--ink)}
+.condrow{display:grid; grid-template-columns:28px minmax(0,1fr) minmax(0,1.2fr); gap:10px; align-items:center}
 .condrow .pl{
-  font-family:var(--mono); font-size:11px; font-weight:600; color:var(--ink-2);
+  font-family:var(--mono); font-size:13px; font-weight:600; color:var(--ink-2);
   text-align:center;
 }
 .dtbl{width:100%; border-collapse:collapse}
-.dtbl td{border:0; padding:3px 6px 3px 0; white-space:nowrap}
+.dtbl td{border:0; padding:4px 8px 4px 0; white-space:nowrap}
 .dtbl input[type=color]{
-  width:26px; height:22px; padding:1px; border-radius:4px; border:1px solid var(--line-2);
+  width:32px; height:28px; padding:1px; border-radius:4px; border:1px solid var(--line-2);
   background:var(--surface-2); cursor:pointer;
 }
-.dtbl input[type=text]{padding:3px 6px; font-size:12px}
+.dtbl input[type=text]{padding:6px 9px; font-size:14px}
 .dtbl input[type=checkbox]{accent-color:var(--accent); cursor:pointer}
-.togwrap{display:flex; flex-wrap:wrap; gap:9px 16px}
-.dim{display:inline-flex; gap:5px; align-items:baseline; font-family:var(--mono); font-size:11px; color:var(--ink-3)}
+.togwrap{display:flex; flex-wrap:wrap; gap:12px 20px}
+.dim{display:inline-flex; gap:5px; align-items:baseline; font-family:var(--mono); font-size:13px; color:var(--ink-3)}
 .dim b{color:var(--ink); font-weight:600}
 .flexline{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
 .spacer{flex:1}
-.toggle{display:inline-flex; align-items:center; gap:7px; cursor:pointer; font-size:12.5px; user-select:none}
-.toggle input{width:auto; margin:0; accent-color:var(--accent)}
+.toggle{display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:14.5px; user-select:none}
+.toggle input{width:17px; height:17px; margin:0; accent-color:var(--accent)}
 .muted{color:var(--ink-3)}
 .mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
 .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
@@ -343,16 +343,21 @@ th .nt{text-transform:none; letter-spacing:0}
           <div class="row2">
             <div class="field"><label for="f-host">Host formula</label>
               <input type="text" id="f-host" value="CuInSe2"></div>
-            <div class="field"><label for="f-dhf">Host energy (type and units below)</label>
+            <div class="field"><label for="f-dhf">Host energy (eV)</label>
               <input type="number" id="f-dhf" step="0.01" value="-2.37"></div>
           </div>
           <div class="field"><label for="f-dop">Extrinsic dopants (optional)</label>
             <input type="text" id="f-dop" value="" placeholder="e.g. Mn, Cr, Co" spellcheck="false" autocomplete="off"></div>
-          <label>Host energy type<select id="host-type"><option value="formation">Formation enthalpy</option><option value="total">Raw total energy</option></select></label>
-          <label>Host energy units<select id="host-basis"><option value="formula">eV / formula unit</option><option value="cell">eV / cell (POSCAR)</option><option value="atom">eV / atom</option></select></label>
-          <label>Formula units per cell (required for eV/cell)<input id="host-units" type="number" min="0" step="any" value="1"></label>
+          <div class="row2">
+            <div class="field"><label for="host-type">Host energy type</label>
+              <select id="host-type"><option value="formation">Formation enthalpy</option><option value="total">Raw total energy</option></select></div>
+            <div class="field"><label for="host-basis">Host energy units</label>
+              <select id="host-basis"><option value="formula">eV / formula unit</option><option value="cell">eV / cell (POSCAR)</option><option value="atom">eV / atom</option></select></div>
+          </div>
+          <div class="field" id="units-field"><label for="host-units">Formula units per cell</label>
+            <input id="host-units" type="number" min="0" step="any" value="1"></div>
           <div id="host-normalized" class="note" role="status"></div>
-          <div class="note">Raw total energy: ΔHf = E(cell)/formula units − Σ nᵢ μᵢ(ref). For eV/formula, do not divide again. Supply consistent references below. Formation enthalpies are already referenced and are not subtracted again. For phases, CSV may include energyType (total/formation), basis (cell/formula/atom), and units (formula units/cell); defaults are formation and formula.</div>
+          <div class="note" id="note-raw">Raw total energy: ΔHf = E(cell)/formula units − Σ nᵢ μᵢ(ref). For eV/formula, do not divide again. Supply consistent references below. Formation enthalpies are already referenced and are not subtracted again. For phases, CSV may include energyType (total/formation), basis (cell/formula/atom), and units (formula units/cell); defaults are formation and formula.</div>
           <div class="note"><b>Optional defect inputs:</b> bulk energy below is the pristine supercell total energy matching the defect supercell. Do not divide this energy by formula units. VBM and gap are not needed for the stability diagram.</div>
           <div class="row3">
             <div class="field"><label for="f-bulk">E<sub>tot</sub> bulk (eV)</label>
@@ -373,9 +378,14 @@ th .nt{text-transform:none; letter-spacing:0}
       <details class="sec">
         <summary>Defect entries <span class="tag" id="tag-def"></span></summary>
         <div class="inner stack">
-          <div class="note">One row per defect <em>and</em> charge state. Element columns hold
-            Δ<i>n</i> — atoms added (+) or removed (−) versus the bulk supercell. Include a column for every host element, even if all entries are zero. Use the same name and composition for all charge states of a defect. For declared extrinsic dopants, add a dopant column (for example <code>Mn</code>: +1 for Mn<sub>Zn</sub>, with <code>Zn</code> −1); a missing dopant column means zero.</div>
+          <div class="note">One row per defect <em>and</em> charge state: <code>defect,charge,E_tot,E_corr</code>.
+            Δ<i>n</i> (atoms added + or removed − versus the bulk supercell) is read from standard names:
+            <code>V_O</code>, <code>Zn_i</code>, <code>Zn_O</code>, <code>Al_Zn</code>, complexes such as <code>Al_Zn+V_Zn</code>.
+            Text in parentheses is ignored, so <code>V_O(split)</code> works. Optionally add element columns
+            (every host element; dopant columns may be omitted). They are then used and checked against the name,
+            and they are required for names in other notation. Write vacancies as <code>Vac_X</code> when vanadium is in the system.</div>
           <textarea id="ta-def" rows="8" spellcheck="false" aria-label="Defect CSV"></textarea>
+          <div id="dn-summary" class="note" hidden></div>
           <div class="btnrow">
             <button class="btn sm primary" id="b-def">Load defects</button>
             <label class="btn sm" style="cursor:pointer">Upload CSV
@@ -401,9 +411,14 @@ th .nt{text-transform:none; letter-spacing:0}
       </details>
 
       <details class="sec">
-        <summary>Reset</summary>
-        <div class="inner btnrow">
-          <button class="btn sm" id="b-demo">Reload example (CuInSe₂)</button>
+        <summary>Examples and reset</summary>
+        <div class="inner stack">
+          <div class="btnrow">
+            <button class="btn sm" id="b-demo">Reload example (CuInSe₂)</button>
+            <button class="btn sm" id="b-ex-zno">ZnO native defects</button>
+            <button class="btn sm" id="b-ex-znoal">ZnO:Al (Al₂O₃ limit)</button>
+          </div>
+          <div class="note">Examples use illustrative numbers to show the input format, including an extrinsic dopant. Loading one replaces the current inputs; save yours first.</div>
         </div>
       </details>
     </div>
@@ -418,12 +433,12 @@ th .nt{text-transform:none; letter-spacing:0}
           + <i>q</i>(<i>E</i><sub>VBM</sub> + <span class="k">E</span><sub>F</sub>)
           + <i>E</i><sub>corr</sub>
         </div>
-        <p style="font-size:12px; color:var(--ink-2)">
+        <p style="font-size:14px; color:var(--ink-2)">
           <b>E</b><sub>F</sub> is referenced to the VBM. <i>E</i><sub>corr</sub> is whatever
           finite-size correction you supply per entry — FNV, eFNV, Lany–Zunger — the app
           treats it as a fixed additive term and never recomputes it. Include potential alignment in that number only if it is not already included in your correction scheme; do not count it twice. Use bulk and defect supercells of the same size. The app does not calculate correction terms or equilibrium Fermi levels.
         </p>
-        <p style="font-size:12px; color:var(--ink-2)">
+        <p style="font-size:14px; color:var(--ink-2)">
           <b>Dopants.</b> At each host condition Δμ<sub>D</sub> is set by the solubility limit:
           Δμ<sub>D</sub> = min[0, (Δ<i>H</i><sub>f</sub>(P) − Σ<sub>i</sub> <i>b<sub>i</sub></i>Δμ<sub>i</sub>)/<i>a</i>] over every
           dopant phase P = D<sub><i>a</i></sub>H<sub><i>b</i></sub>…. With MnO<sub>2</sub>,
@@ -458,7 +473,7 @@ th .nt{text-transform:none; letter-spacing:0}
               <div class="vtx-list" id="vtx-list"></div>
             </div>
             <div>
-              <div class="lbl" style="margin-bottom:6px;text-transform:none;letter-spacing:.04em">Δμ IN USE (eV)</div>
+              <div class="lbl" style="margin-bottom:6px">Δμ in use (eV)</div>
               <div id="dmu-inputs" class="stack" style="gap:6px"></div>
             </div>
             <div id="feas"></div>
@@ -508,7 +523,7 @@ th .nt{text-transform:none; letter-spacing:0}
           <div class="flexline" style="margin-bottom:10px">
             <span class="lbl">panels</span>
             <select id="f-n" style="width:auto"><option>1</option><option>2</option><option>3</option></select>
-            <span class="muted" style="font-size:12px">each panel is the same defect set at a different Δμ</span>
+            <span class="muted" style="font-size:14px">each panel is the same defect set at a different Δμ</span>
           </div>
           <div class="stack" style="gap:7px" id="cond-rows"></div>
         </div>
