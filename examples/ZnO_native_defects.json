@@ -7,7 +7,7 @@
     "f-bulk": "-330.4521",
     "f-vbm": "2",
     "f-gap": "3.4",
-    "ta-def": "# ILLUSTRATIVE numbers only (not from a real calculation). 72-atom ZnO supercell, energies in eV.\ndefect,charge,E_tot,E_corr,Zn,O\nV_O,2,-330.4221,0.60,0,-1\nV_O,1,-325.3721,0.15,0,-1\nV_O,0,-321.0221,0.00,0,-1\nV_Zn,0,-319.8881,0.00,-1,0\nV_Zn,-1,-317.1381,0.15,-1,0\nV_Zn,-2,-313.9881,0.60,-1,0\nZn_i,2,-337.7161,0.60,1,0\nZn_i,1,-331.6661,0.15,1,0\nZn_i,0,-325.8161,0.00,1,0",
+    "ta-def": "# ILLUSTRATIVE numbers only (not from a real calculation). 72-atom ZnO supercell, energies in eV.\n# \u0394n is read from the defect names (no element columns needed).\ndefect,charge,E_tot,E_corr\nV_O,2,-330.4221,0.60\nV_O,1,-325.3721,0.15\nV_O,0,-321.0221,0.00\nV_Zn,0,-319.8881,0.00\nV_Zn,-1,-317.1381,0.15\nV_Zn,-2,-313.9881,0.60\nZn_i,2,-337.7161,0.60\nZn_i,1,-331.6661,0.15\nZn_i,0,-325.8161,0.00",
     "ta-ph": ""
   },
   "hostEnergy": {

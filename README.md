@@ -8,7 +8,7 @@ A browser-based app for plotting DFT defect formation energies and thermodynamic
 
 1. Replace the illustrative CuInSe₂ example with your host formula, formation enthalpy **per formula exactly as entered**, pristine-supercell total energy, VBM and positive band gap.
 2. Supply consistent elemental reference energies **per atom**. For an oxygen molecule, divide its total energy by two. Use raw bulk and defect energies from matching supercells and the same calculation settings/reference convention. When you change the host formula, references for new elements start **blank** (never a silent zero); defect plots stay disabled until they are filled in.
-3. Paste or upload a defect CSV/TSV. Include every host element as a column. Positive atom counts mean atoms **added**; negative counts mean atoms **removed**. Each defect name must have the same composition across its charge states.
+3. Paste or upload a defect CSV/TSV. The atom-count changes Δn can be read from standard defect names, so element columns are optional (see **Δn from defect names** below). If you give element columns, include every host element. Positive counts mean atoms **added**; negative counts mean atoms **removed**. Each defect name must have the same composition across its charge states.
 4. Paste or upload competing-phase formation enthalpies. Leave the phase table empty for elemental bounds only. Click **Calculate** (or **Load defects / Load phases**) after editing.
 5. Choose a stability vertex, or edit the independent Δμ values. The remaining potential follows the host equality. Outside-region conditions are marked; they are not equilibrium growth conditions.
 6. Use the publication controls for one to three panels, colors, labels, size, ticks and fonts. Line-end labels are placed in a reserved strip to the right of each panel so they never cover the curves; charge labels are moved along or below their segment to avoid one another and the panel caption. Download a native XmGrace project with **Grace (.agr)**, editable SVG, or PNG at 300/600 dpi. Open the AGR in XmGrace with **File → Open**. Each publication panel is a graph, each visible defect envelope is a separate XY set, and enabled transition markers are separate point sets. Edit line styles in Set appearance and tick spacing or axis labels in Axis properties. Native Grace fonts and label placement can differ from the browser preview. PNG files carry both the requested pixel size and resolution metadata.
@@ -18,8 +18,8 @@ A browser-based app for plotting DFT defect formation energies and thermodynamic
 
 The `examples/` folder holds input files in the **Save inputs** format. Load them with the buttons under **Examples and reset**, or download one and open it with **Open inputs / Lab session**. All numbers are illustrative: they were chosen to show the format and typical behaviour, not taken from a real calculation.
 
-- `ZnO_native_defects.json`: V_O (deep, negative-U ε(2+/0)), V_Zn (acceptor, ε(0/−) and ε(−/2−)) and Zn_i (shallow donor), Zn-rich and O-rich limits.
-- `ZnO_Al_doped.json`: the same defects plus Al_Zn and Al_i, with Δμ_Al set by Al₂O₃ (`Δμ_Al = [ΔHf(Al2O3) − 3Δμ_O]/2`). The phase table contains a commented-out `ZnAl2O4` line. Remove the `#` and press **Calculate** to see the spinel become the limiting phase. Next to ZnO it is the real solubility limit, because ZnO + Al₂O₃ → ZnAl₂O₄ is exothermic.
+- `ZnO_native_defects.json` (no element columns: Δn comes from the names): V_O (deep, negative-U ε(2+/0)), V_Zn (acceptor, ε(0/−) and ε(−/2−)) and Zn_i (shallow donor), Zn-rich and O-rich limits.
+- `ZnO_Al_doped.json` (with element columns, which are checked against the names): the same defects plus Al_Zn and Al_i, with Δμ_Al set by Al₂O₃ (`Δμ_Al = [ΔHf(Al2O3) − 3Δμ_O]/2`). The phase table contains a commented-out `ZnAl2O4` line. Remove the `#` and press **Calculate** to see the spinel become the limiting phase. Next to ZnO it is the real solubility limit, because ZnO + Al₂O₃ → ZnAl₂O₄ is exothermic.
 
 ### Defect table example (illustrative values only)
 
@@ -41,6 +41,27 @@ Cu_i,0,-1125.1767,0.00,1,0,0
 ```
 
 `E_corr` is optional (omitting the column means zero); when present every cell must be numeric. Use integer charge states and integer changes in atom counts. Quoted names containing commas are supported. Each record must occupy one line. Multiple configurations of the same defect and charge are allowed: the lowest energy is used.
+
+### Δn from defect names
+
+Δn depends only on which atoms are added or removed, which standard notation already states. Each part of a name is `X_Y`: X is the added atom (or `V` / `Vac` for a vacancy) and Y is the site (an element, or `i` / `int` for an interstitial).
+
+| Name | Δn |
+|---|---|
+| `V_O`, `Vac_O` | O −1 |
+| `Zn_i`, `Zn_int` | Zn +1 |
+| `Zn_O` (antisite) | Zn +1, O −1 |
+| `Al_Zn` (dopant) | Al +1, Zn −1 |
+| `Al_Zn+V_Zn` (complex; `+` or `-` joins parts) | Al +1, Zn −2 |
+
+Text in `()`, `[]` or `{}` and charge marks such as `^2+` are ignored, so `V_O(split)`, `O_i[oct]` and `V_O^{2+}` work. These rules apply:
+
+- **No element columns:** Δn is read from the names. A name in another notation (for example `DX`) is an error that asks for element columns. Nothing is guessed.
+- **Element columns given:** they are used, and every standard name is checked against them. A mismatch (wrong sign, swapped column, forgotten dopant column) is an error showing both readings. Names in other notation are accepted on the columns alone.
+- **An element that is neither in the host nor declared as a dopant** (for example `Mn_Zn` without Mn under Extrinsic dopants) is an error asking you to declare it.
+- **When vanadium is in the system,** `V_X` is ambiguous. Write vacancies as `Vac_X`, or give element columns.
+
+A summary under the defect table shows the Δn used for each defect and where it came from (name, or columns checked against the name).
 
 ### Competing-phase table
 
@@ -141,4 +162,4 @@ python3 -m http.server 8766 --bind 127.0.0.1
 
 Open `http://127.0.0.1:8766/`. There are no npm dependencies to install. You can also open `index.html` locally with `app.js` alongside it; clipboard permissions may be more limited on file URLs.
 
-The automated tests cover formula/CSV validation, binary/ternary/quaternary constraints, infeasible hosts, atom-count signs, reference energies and corrections, transition levels, dopant solubility limits (including their dependence on host Δμ and ternary dopant phases), dopant formation energies, publication label placement, publication SVG and PNG resolution metadata. Browser checks additionally cover rendering and exports.
+The automated tests cover formula/CSV validation, binary/ternary/quaternary constraints, infeasible hosts, atom-count signs, reference energies and corrections, transition levels, dopant solubility limits (including their dependence on host Δμ and ternary dopant phases), dopant formation energies, Δn from defect names and its cross-check against element columns, the bundled examples, publication label placement, publication SVG and PNG resolution metadata. Browser checks additionally cover rendering and exports.

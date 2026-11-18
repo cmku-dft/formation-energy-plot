@@ -373,9 +373,14 @@ th .nt{text-transform:none; letter-spacing:0}
       <details class="sec">
         <summary>Defect entries <span class="tag" id="tag-def"></span></summary>
         <div class="inner stack">
-          <div class="note">One row per defect <em>and</em> charge state. Element columns hold
-            Δ<i>n</i> — atoms added (+) or removed (−) versus the bulk supercell. Include a column for every host element, even if all entries are zero. Use the same name and composition for all charge states of a defect. For declared extrinsic dopants, add a dopant column (for example <code>Mn</code>: +1 for Mn<sub>Zn</sub>, with <code>Zn</code> −1); a missing dopant column means zero.</div>
+          <div class="note">One row per defect <em>and</em> charge state: <code>defect,charge,E_tot,E_corr</code>.
+            Δ<i>n</i> (atoms added + or removed − versus the bulk supercell) is read from standard names:
+            <code>V_O</code>, <code>Zn_i</code>, <code>Zn_O</code>, <code>Al_Zn</code>, complexes such as <code>Al_Zn+V_Zn</code>.
+            Text in parentheses is ignored, so <code>V_O(split)</code> works. Optionally add element columns
+            (every host element; dopant columns may be omitted). They are then used and checked against the name,
+            and they are required for names in other notation. Write vacancies as <code>Vac_X</code> when vanadium is in the system.</div>
           <textarea id="ta-def" rows="8" spellcheck="false" aria-label="Defect CSV"></textarea>
+          <div id="dn-summary" class="note" hidden></div>
           <div class="btnrow">
             <button class="btn sm primary" id="b-def">Load defects</button>
             <label class="btn sm" style="cursor:pointer">Upload CSV

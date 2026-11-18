@@ -228,3 +228,34 @@ test('bundled ZnO examples load and give the documented limits and levels',()=>{
   }
  }
 });
+test('defect names give Δn: vacancies, interstitials, antisites, dopants, complexes and labels',()=>{
+ const r=engine(), dn=(n,sp=['Zn','O','Al'])=>{const p=r(`parseDefectName(${JSON.stringify(n)},${JSON.stringify(sp)})`); return p&&JSON.parse(JSON.stringify(p));};
+ assert.deepEqual(dn('V_O').dn,{O:-1}); assert.deepEqual(dn('Vac_Zn').dn,{Zn:-1}); assert.deepEqual(dn('Zn_i').dn,{Zn:1});
+ assert.deepEqual(dn('Zn_O').dn,{Zn:1,O:-1}); assert.deepEqual(dn('Al_Zn').dn,{Al:1,Zn:-1}); assert.deepEqual(dn('Al_int').dn,{Al:1});
+ assert.deepEqual(dn('Al_Zn+V_Zn').dn,{Al:1,Zn:-2}); assert.deepEqual(dn('V_O-V_Zn').dn,{O:-1,Zn:-1});
+ assert.deepEqual(dn('V_O(split)').dn,{O:-1}); assert.deepEqual(dn('O_i[oct]').dn,{O:1}); assert.deepEqual(dn('V_O^{2+}').dn,{O:-1});
+ assert.deepEqual(dn('Zn_i+V_Zn').dn,{Zn:0});
+ for(const bad of ['DX','V_i','Zn_Zn','Xx_O','V_O_split','VO','']) assert.equal(dn(bad),null,bad);
+ assert.deepEqual(dn('Mn_Zn').unknown,['Mn']);
+ assert.equal(dn('V_O',['Bi','V','O']).ambiguous,true); assert.equal(dn('Vac_O',['Bi','V','O']).ambiguous,false);
+ assert.deepEqual(dn('V_Bi',['Bi','V','O']).dn,{Bi:-1});
+});
+test('name mode: Δn from names without element columns, clear errors otherwise',()=>{
+ const r=engine(), L=t=>JSON.parse(JSON.stringify(r(`loadDefects(${JSON.stringify(t)},["Zn","O"],["Al"])`)));
+ const ok=L('defect,charge,E_tot,E_corr\nV_O,2,-95,0.3\nV_O(split),0,-90,0\nAl_Zn,1,-106,0.1\nAl_Zn+V_Zn,0,-100,0');
+ assert.equal(ok.errs.length,0);
+ assert.deepEqual(ok.list.map(d=>d.dn),[{Zn:0,O:-1,Al:0},{Zn:0,O:-1,Al:0},{Zn:-1,O:0,Al:1},{Zn:-2,O:0,Al:1}]);
+ assert.ok(ok.list.every(d=>d.dnSource==='name'));
+ assert.match(L('defect,charge,E_tot\nDX,0,-1').errs[0],/cannot read Δn/);
+ assert.match(L('defect,charge,E_tot\nMn_Zn,0,-1').errs[0],/Extrinsic dopants/);
+ assert.match(JSON.parse(JSON.stringify(r('loadDefects("defect,charge,E_tot\\nV_O,0,-1",["Bi","V","O"])'))).errs[0],/vanadium/);
+ assert.equal(JSON.parse(JSON.stringify(r('loadDefects("defect,charge,E_tot\\nVac_O,0,-1",["Bi","V","O"])'))).errs.length,0);
+});
+test('column mode: columns are cross-checked against standard names',()=>{
+ const r=engine(), L=t=>JSON.parse(JSON.stringify(r(`loadDefects(${JSON.stringify(t)},["Zn","O"],["Al"])`)));
+ const ok=L('defect,charge,E_tot,Zn,O,Al\nV_O,0,-90,0,-1,0\nDX,0,-90,-1,0,1');
+ assert.equal(ok.errs.length,0); assert.equal(ok.list[0].dnSource,'columns, match name'); assert.equal(ok.list[1].dnSource,'columns');
+ assert.match(L('defect,charge,E_tot,Zn,O\nV_O,0,-90,-1,0').errs[0],/V_O means O −1, but the element columns give Zn −1/);
+ assert.match(L('defect,charge,E_tot,Zn,O,Al\nAl_Zn,0,-90,0,0,1').errs[0],/Al \+1, Zn −1/);   // sign/column slip
+ assert.match(L('defect,charge,E_tot,Zn,O\nAl_Zn,0,-90,-1,0').errs[0],/Al_Zn means/);          // forgotten dopant column
+});

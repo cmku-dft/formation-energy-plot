@@ -115,6 +115,40 @@ const numOr = (v, d) => {
   const x = Number(t); return Number.isFinite(x) ? x : d;
 };
 
+/* Δn from standard defect notation. Each part is X_Y: X is the added atom
+   (or V / Vac for a vacancy) and Y the site (an element, or i / int for an
+   interstitial). Complexes join parts with + or -. Text in (), [] or {} and
+   charge marks such as ^2+ are ignored, so V_O(split) and V_O^{2+} work.
+   Returns {dn, unknown, ambiguous} or null when the name is not in this
+   notation. "V_X" is ambiguous when vanadium is part of the system. */
+function parseDefectName(name, species = []){
+  const core = String(name).replace(/\([^)]*\)|\[[^\]]*\]|\{[^}]*\}/g, "")
+    .replace(/\^[0-9+\-−]*/g, "").replace(/\s+/g, "");
+  if(!core) return null;
+  const dn = {};
+  let ambiguous = false;
+  for(const part of core.split(/[+\-–]/)){
+    const m = part.match(/^(Vac|[A-Z][a-z]?|v)_([A-Z][a-z]?|int|i)$/);
+    if(!m) return null;
+    const [, a, b] = m;
+    const vac = a === "V" || a === "Vac" || a === "v";
+    const inter = b === "i" || b === "int";
+    if(a === "V" && species.includes("V")) ambiguous = true;
+    if(vac && inter) return null;
+    if(!vac && !ELEMENTS.has(a)) return null;
+    if(!inter && !ELEMENTS.has(b)) return null;
+    if(a === b) return null;
+    if(!vac) dn[a] = (dn[a] || 0) + 1;
+    if(!inter) dn[b] = (dn[b] || 0) - 1;
+  }
+  const unknown = Object.keys(dn).filter(el => dn[el] && !species.includes(el));
+  return {dn, unknown, ambiguous};
+}
+function fmtDn(dn){
+  const parts = Object.entries(dn).filter(([, n]) => n).map(([el, n]) => `${el} ${n > 0 ? "+" : "−"}${Math.abs(n)}`);
+  return parts.length ? parts.join(", ") : "no change";
+}
+
 function loadDefects(text, elements, dopants = []){
   const {head, rows, rawHead} = parseTable(text);
   const iName = head.findIndex(h => ["defect","name","label"].includes(h));
@@ -125,21 +159,26 @@ function loadDefects(text, elements, dopants = []){
   if(iName < 0) errs.push("no 'defect' column");
   if(iQ < 0) errs.push("no 'charge' column");
   if(iE < 0) errs.push("no 'E_tot' column");
-  const elCol = {};
-  for(const el of elements){
-    const j = rawHead.findIndex(h => h === el);
-    if(j >= 0) elCol[el] = j;
-    else errs.push(`missing '${el}' atom-count column (use 0 if unchanged)`);
-  }
-  // Dopant columns are optional (a missing column means no dopant atoms in that defect).
-  for(const el of dopants){
-    const j = rawHead.findIndex(h => h === el);
-    if(j >= 0) elCol[el] = j;
-  }
-  for(const col of rawHead) if(ELEMENTS.has(col) && !elements.includes(col) && !dopants.includes(col))
-    errs.push(`Column '${col}' is not a host element. Declare it under Extrinsic dopants to use it.`);
-  if(errs.length) return {list:[], errs};
+  // Column mode: element columns given; they are used and cross-checked against
+  // the names. Name mode: no element columns; Δn comes from the names.
   const species = [...elements, ...dopants];
+  const colMode = rawHead.some(h => ELEMENTS.has(h));
+  const elCol = {};
+  if(colMode){
+    for(const el of elements){
+      const j = rawHead.findIndex(h => h === el);
+      if(j >= 0) elCol[el] = j;
+      else errs.push(`missing '${el}' atom-count column (use 0 if unchanged, or remove all element columns to read Δn from the defect names)`);
+    }
+    // Dopant columns are optional (a missing column means no dopant atoms in that defect).
+    for(const el of dopants){
+      const j = rawHead.findIndex(h => h === el);
+      if(j >= 0) elCol[el] = j;
+    }
+    for(const col of rawHead) if(ELEMENTS.has(col) && !species.includes(col))
+      errs.push(`Column '${col}' is not a host element. Declare it under Extrinsic dopants to use it.`);
+  }
+  if(errs.length) return {list:[], errs};
   const list = [];
   rows.forEach((r, n) => {
     const nm = r[iName];
@@ -149,8 +188,31 @@ function loadDefects(text, elements, dopants = []){
     if(!Number.isInteger(q) || !Number.isFinite(E)){
       errs.push(`row ${n+2}: charge must be an integer and E_tot must be a finite number`); return;
     }
+    const parsed = parseDefectName(nm, species);
+    if(parsed && parsed.unknown.length){
+      errs.push(`row ${n+2}: ${nm} contains ${parsed.unknown.join(", ")}, which is not a host element. Add it under Extrinsic dopants.`); return;
+    }
     const dn = {};
-    for(const el of species) dn[el] = elCol[el] === undefined ? 0 : numOr(r[elCol[el]], NaN);
+    let dnSource;
+    if(colMode){
+      for(const el of species) dn[el] = elCol[el] === undefined ? 0 : numOr(r[elCol[el]], NaN);
+      dnSource = "columns";
+      if(parsed && !parsed.ambiguous && Object.values(dn).every(Number.isInteger)){
+        if(species.some(el => (parsed.dn[el] || 0) !== dn[el])){
+          errs.push(`row ${n+2}: ${nm} means ${fmtDn(parsed.dn)}, but the element columns give ${fmtDn(dn)}. Fix the columns or rename the defect (text in parentheses is ignored).`); return;
+        }
+        dnSource = "columns, match name";
+      }
+    } else {
+      if(!parsed){
+        errs.push(`row ${n+2}: cannot read Δn from the name '${nm}'. Use notation such as V_O, Zn_i, Al_Zn or Al_Zn+V_Zn, or add element columns.`); return;
+      }
+      if(parsed.ambiguous){
+        errs.push(`row ${n+2}: in '${nm}', V could mean a vacancy or vanadium. Write the vacancy as Vac_X, or add element columns.`); return;
+      }
+      for(const el of species) dn[el] = parsed.dn[el] || 0;
+      dnSource = "name";
+    }
     const Ecorr = iC >= 0 ? numOr(r[iC], NaN) : 0;
     if(!Number.isFinite(Ecorr) || !Object.values(dn).every(Number.isInteger)){
       errs.push(`row ${n+2}: E_corr must be numeric and atom counts must be integers`); return;
@@ -160,7 +222,7 @@ function loadDefects(text, elements, dopants = []){
       errs.push(`row ${n+2}: all charge states of ${nm} must have the same atom counts`); return;
     }
     if(list.filter(d => d.name === nm).length >= 100){ errs.push(`${nm}: limit 100 entries per defect`); return; }
-    list.push({name:nm, q, Etot:E, Ecorr, dn});
+    list.push({name:nm, q, Etot:E, Ecorr, dn, dnSource});
   });
   return {list, errs};
 }
@@ -803,6 +865,17 @@ function renderDopants(){
   }
 }
 
+function renderDnSummary(){
+  const seen = new Map();
+  for(const d of S.defects) if(!seen.has(d.name)) seen.set(d.name, d);
+  const label = {"name":"from name", "columns, match name":"columns ✓ name", "columns":"columns (name not in standard notation)"};
+  $("dn-summary").innerHTML = seen.size
+    ? `<div class="lbl" style="margin-bottom:4px;text-transform:none;letter-spacing:.04em">Δn USED</div>` +
+      [...seen.values()].map(d => `<div class="mono" style="font-size:11.5px">${esc(d.name)}: ${esc(fmtDn(d.dn))} <span class="muted">· ${esc(label[d.dnSource] || d.dnSource)}</span></div>`).join("")
+    : "";
+  $("dn-summary").hidden = !seen.size;
+}
+
 function renderLegend(){
   const names = defectNames();
   $("legend").innerHTML = names.map((n, i) => {
@@ -874,7 +947,7 @@ function pickVertex(i){
 }
 function draw(){
   if(!S.valid) return;
-  renderChips(); renderVertexList(); renderDmuInputs(); renderFeas(); renderDopants();
+  renderChips(); renderVertexList(); renderDmuInputs(); renderFeas(); renderDopants(); renderDnSummary();
   renderRegion(); renderMsgs();
   if(S.defectReady === false){
     for(const id of ["legend","svg-main","fig-prev","cond-rows","fig-series"]) $(id).innerHTML = "";
@@ -957,7 +1030,8 @@ const EXPORT_IDS = ["b-svg", "b-tsv", "b-png", "b-png6", "b-svgdl", "b-agr", "b-
 function invalidate(message){
   S.valid = false;
   $("input-status").innerHTML = `<div class="note bad"><b>Inputs need attention.</b> ${esc(message)} Results are cleared until the inputs are corrected.</div>`;
-  for(const id of ["chips","vtx-list","dmu-inputs","feas","dop-panel","legend","svg-region","svg-main","fig-prev","cond-rows","fig-series","main-msg"]) $(id).innerHTML = "";
+  $("dn-summary").hidden = true;
+  for(const id of ["chips","vtx-list","dmu-inputs","feas","dop-panel","dn-summary","legend","svg-region","svg-main","fig-prev","cond-rows","fig-series","main-msg"]) $(id).innerHTML = "";
   for(const id of ["tbl-lv","tbl-edge"]) $(id).querySelector("tbody").innerHTML = "";
   $("region-dim").textContent = "Calculation paused";
   $("cond-tag").textContent = "";
