@@ -36,6 +36,7 @@ CuIn5Se8,-8.98`
 const S = {
   elements:[], hostCoeff:{}, hostDHf:0, bulk:0, vbm:0, gap:1,
   muRef:{}, defects:[], phases:[], dmu:{}, verts:[], pivot:0,
+  dopants:[], dopPhases:[], dopSet:{},
   axX:null, axY:null, selVtx:0, hidden:new Set(),
   showAll:false, showLbl:true, errors:[]
 };
@@ -114,7 +115,7 @@ const numOr = (v, d) => {
   const x = Number(t); return Number.isFinite(x) ? x : d;
 };
 
-function loadDefects(text, elements){
+function loadDefects(text, elements, dopants = []){
   const {head, rows, rawHead} = parseTable(text);
   const iName = head.findIndex(h => ["defect","name","label"].includes(h));
   const iQ    = head.findIndex(h => ["charge","q"].includes(h));
@@ -130,9 +131,15 @@ function loadDefects(text, elements){
     if(j >= 0) elCol[el] = j;
     else errs.push(`missing '${el}' atom-count column (use 0 if unchanged)`);
   }
-  for(const col of rawHead) if(ELEMENTS.has(col) && !elements.includes(col))
-    errs.push(`Unsupported dopant column '${col}': only host elements are supported.`);
+  // Dopant columns are optional (a missing column means no dopant atoms in that defect).
+  for(const el of dopants){
+    const j = rawHead.findIndex(h => h === el);
+    if(j >= 0) elCol[el] = j;
+  }
+  for(const col of rawHead) if(ELEMENTS.has(col) && !elements.includes(col) && !dopants.includes(col))
+    errs.push(`Column '${col}' is not a host element. Declare it under Extrinsic dopants to use it.`);
   if(errs.length) return {list:[], errs};
+  const species = [...elements, ...dopants];
   const list = [];
   rows.forEach((r, n) => {
     const nm = r[iName];
@@ -143,13 +150,13 @@ function loadDefects(text, elements){
       errs.push(`row ${n+2}: charge must be an integer and E_tot must be a finite number`); return;
     }
     const dn = {};
-    for(const el of elements) dn[el] = numOr(r[elCol[el]], NaN);
+    for(const el of species) dn[el] = elCol[el] === undefined ? 0 : numOr(r[elCol[el]], NaN);
     const Ecorr = iC >= 0 ? numOr(r[iC], NaN) : 0;
     if(!Number.isFinite(Ecorr) || !Object.values(dn).every(Number.isInteger)){
       errs.push(`row ${n+2}: E_corr must be numeric and atom counts must be integers`); return;
     }
     const previous = list.find(d => d.name === nm);
-    if(previous && elements.some(el => previous.dn[el] !== dn[el])){
+    if(previous && species.some(el => previous.dn[el] !== dn[el])){
       errs.push(`row ${n+2}: all charge states of ${nm} must have the same atom counts`); return;
     }
     if(list.filter(d => d.name === nm).length >= 100){ errs.push(`${nm}: limit 100 entries per defect`); return; }
@@ -158,23 +165,27 @@ function loadDefects(text, elements){
   return {list, errs};
 }
 
-function loadPhases(text, elements){
-  if(!String(text).trim()) return {list:[], errs:[]};
+// Phases made only of host elements bound the host stability region (list).
+// Phases containing one declared dopant (plus any host elements) bound that
+// dopant's chemical potential (dopList); they do not change the host region.
+function loadPhases(text, elements, dopants = []){
+  if(!String(text).trim()) return {list:[], dopList:[], errs:[]};
   const {head, rows, rawHead} = parseTable(text);
   const iName = head.findIndex(h => ["phase","formula","name","compound"].includes(h));
   const iH    = head.findIndex(h => ["dhf","d_hf","hf","enthalpy","e_f","dh"].includes(h));
   const errs = [];
-  if(iName < 0 || iH < 0) return {list:[], errs:["need 'phase' and 'dHf' columns"]};
+  if(iName < 0 || iH < 0) return {list:[], dopList:[], errs:["need 'phase' and 'dHf' columns"]};
+  const species = [...elements, ...dopants];
   const elCol = {};
-  for(const el of elements){
+  for(const el of species){
     const j = rawHead.findIndex(h => h === el);
     if(j >= 0) elCol[el] = j;
   }
-  for(const col of rawHead) if(ELEMENTS.has(col) && !elements.includes(col))
-    errs.push(`Phase column '${col}' is outside the host elements.`);
-  if(errs.length) return {list:[], errs};
+  for(const col of rawHead) if(ELEMENTS.has(col) && !species.includes(col))
+    errs.push(`Phase column '${col}' is neither a host element nor a declared dopant.`);
+  if(errs.length) return {list:[], dopList:[], errs};
   const hasCols = Object.keys(elCol).length > 0;
-  const list = [];
+  const list = [], dopList = [];
   rows.forEach((r, n) => {
     const nm = r[iName];
     if(!nm){ errs.push(`row ${n+2}: missing phase name`); return; }
@@ -182,19 +193,21 @@ function loadPhases(text, elements){
     if(!Number.isFinite(dHf)){ errs.push(`row ${n+2}: bad dHf`); return; }
     let comp = {};
     if(hasCols){
-      for(const el of elements) comp[el] = elCol[el] !== undefined ? numOr(r[elCol[el]], NaN) : 0;
-
+      for(const el of species) comp[el] = elCol[el] !== undefined ? numOr(r[elCol[el]], NaN) : 0;
     } else {
       comp = parseFormula(nm) || {};
     }
-    const foreign = Object.keys(comp).filter(k => !elements.includes(k));
-    if(foreign.length){ errs.push(`${nm}: contains elements outside the host (${foreign.join(", ")})`); return; }
+    const foreign = Object.keys(comp).filter(k => !species.includes(k));
+    if(foreign.length){ errs.push(`${nm}: contains elements outside the host (${foreign.join(", ")}). Declare extrinsic dopants first.`); return; }
     if(!Object.values(comp).every(v => Number.isFinite(v) && v >= 0) || Object.values(comp).every(v => !v)){ errs.push(`${nm}: could not read composition`); return; }
+    const dops = dopants.filter(el => comp[el] > 0);
+    if(dops.length > 1){ errs.push(`${nm}: phases containing more than one dopant (${dops.join(", ")}) are not supported.`); return; }
     try {const col=(name,fallback)=>{const j=head.indexOf(name);return j<0?fallback:r[j];};dHf=normalizeEnergy(dHf,col('energytype','formation'),col('basis','formula'),col('units',1),comp,S.muRef);}
     catch(err){errs.push(`${nm}: ${err.message}`);return;}
-    list.push({name:nm, comp, dHf});
+    if(dops.length) dopList.push({name:nm, comp, dHf, dop:dops[0]});
+    else list.push({name:nm, comp, dHf});
   });
-  return {list, errs};
+  return {list, dopList, errs};
 }
 
 /* ============================================================ linear algebra */
@@ -318,10 +331,41 @@ function feasibility(dmu){
 }
 
 /* ============================================================ energetics */
+/* Extrinsic dopants (dilute limit). The host region fixes Δμ of the host
+   elements; each dopant phase D_a H1_b1 H2_b2 ... must not precipitate:
+     a·Δμ_D + Σ b_i Δμ_i ≤ ΔHf(phase)  →  Δμ_D ≤ (ΔHf − Σ b_i Δμ_i)/a
+   together with the elemental limit Δμ_D ≤ 0. The solubility limit is the
+   lowest of these bounds, so with MnO2 the bound on Δμ_Mn moves with Δμ_O. */
+function dopantLimits(el, hostDmu){
+  const out = [{name:`${el} elemental limit`, v:0}];
+  for(const ph of S.dopPhases || []){
+    if(ph.dop !== el) continue;
+    let s = ph.dHf;
+    for(const e of S.elements) s -= (ph.comp[e] || 0)*hostDmu[e];
+    out.push({name:ph.name, v:s/ph.comp[el]});
+  }
+  return out.sort((a, b) => a.v - b.v);
+}
+function dopantState(el, hostDmu){
+  const lim = dopantLimits(el, hostDmu), set = (S.dopSet || {})[el] || {mode:"auto"};
+  let v = lim[0].v, src = lim[0].name, mode = "auto";
+  if(set.mode === "phase"){
+    const hit = lim.find(l => l.name === set.phase);
+    if(hit){ v = hit.v; src = hit.name; mode = "phase"; }
+  } else if(set.mode === "fixed" && Number.isFinite(set.value)){
+    v = set.value; src = "fixed value"; mode = "fixed";
+  }
+  return {v, src, mode, lim, viol:lim.filter(l => v > l.v + 1e-6)};
+}
+function fullDmu(hostDmu){
+  const out = {...hostDmu};
+  for(const el of S.dopants || []) out[el] = dopantState(el, hostDmu).v;
+  return out;
+}
 function ef(d, EF, dmu){
-  const M = dmu || S.dmu;
+  const M = fullDmu(dmu || S.dmu);
   let e = d.Etot - S.bulk + d.Ecorr + d.q*(S.vbm + EF);
-  for(const el of S.elements) e -= (d.dn[el]||0)*((S.muRef[el]||0) + (M[el]||0));
+  for(const [el, n] of Object.entries(d.dn)) if(n) e -= n*(S.muRef[el] + (M[el] || 0));
   return e;
 }
 function defectNames(){
@@ -362,6 +406,23 @@ function envelope(ls, gap){
     levels.push({q1:segs[i].q, q2:segs[i+1].q, eps:x, ef:segs[i].A + segs[i].q*x});
   }
   return {segs, levels};
+}
+
+/* Find a free spot for a charge label on one envelope segment. Tries the
+   middle first, then other points along the segment, above then below the
+   line; returns null when every candidate collides with a placed label. */
+function labelSpot(seg, SX, SY, placed, o){
+  for(const f of [0.5, 0.32, 0.68, 0.2, 0.8]){
+    const x = seg.x0 + f*(seg.x1 - seg.x0), px = SX(x), py = SY(seg.A + seg.q*x);
+    for(const ty of [py - o.above, py + o.below]){
+      if(ty < o.top || ty > o.bottom) continue;
+      if(placed.some(q => Math.abs(q[0]-px) < o.w && Math.abs(q[1]-ty) < o.h)) continue;
+      if((o.avoid || []).some(r => px + o.w/2 > r.x0 && px - o.w/2 < r.x1 && ty + o.h/2 > r.y0 && ty - o.h/2 < r.y1)) continue;
+      placed.push([px, ty]);
+      return [px, ty];
+    }
+  }
+  return null;
 }
 
 /* ============================================================ number helpers */
@@ -531,6 +592,7 @@ function renderMain(){
   }
 
   // envelopes
+  const placed = [];                       // charge-label positions already drawn
   for(const d of data){
     const pts = [];
     d.segs.forEach((s, i) => {
@@ -550,9 +612,9 @@ function renderMain(){
     if(S.showLbl) for(const s of d.segs){
       const w = SX(s.x1) - SX(s.x0);
       if(w < 42) continue;
-      const xm = (s.x0 + s.x1)/2;
-      const y = SY(s.A + s.q*xm);
-      g += `<text x="${SX(xm)}" y="${y - 7}" fill="${d.color}" font-size="10" font-weight="600"
+      const spot = labelSpot(s, SX, SY, placed, {w:22, h:12, above:7, below:15, top:m.t+10, bottom:m.t+ih-2});
+      if(!spot) continue;
+      g += `<text x="${spot[0]}" y="${spot[1]}" fill="${d.color}" font-size="10" font-weight="600"
              font-family="monospace" text-anchor="middle"
              paint-order="stroke" stroke="${surf}" stroke-width="3"
              stroke-linejoin="round">${sgn(s.q)}</text>`;
@@ -632,11 +694,11 @@ function renderChips(){
     `<span class="chip">host <b>${esc(S.hostFormula)}</b></span>`,
     S.defectReady === false ? '<span class="chip">stability only</span>' : `<span class="chip">gap <b>${fx(S.gap,2)} eV</b></span>`,
     `<span class="chip">${n} defect${n===1?"":"s"} · <b>${S.defects.length}</b> entries</span>`,
-    `<span class="chip">Δμ <b>${S.elements.map(e => `${e} ${fx(S.dmu[e],2)}`).join(" · ")}</b></span>`
+    `<span class="chip">Δμ <b>${[...S.elements, ...S.dopants].map(e => `${e} ${fx(fullDmu(S.dmu)[e],2)}`).join(" · ")}</b></span>`
   ].join("");
-  $("cond-tag").textContent = cond
+  $("cond-tag").textContent = (cond
     ? `vertex ${String.fromCharCode(65+S.selVtx)} — ${cond.act.join(" + ")}`
-    : "custom Δμ";
+    : "custom Δμ") + S.dopants.map(el => `; Δμ(${el}) from ${dopantState(el, S.dmu).src}`).join("");
   $("tag-host").textContent = S.elements.join(" ");
   $("tag-def").textContent = `${S.defects.length} rows`;
   $("tag-ph").textContent = `${S.phases.length} phases`;
@@ -662,7 +724,7 @@ function renderDmuInputs(){
   const p = S.elements[S.pivot];
   $("dmu-inputs").innerHTML = S.elements.map(e => `
     <div class="flexline" style="gap:8px">
-      <span class="lbl" style="width:56px">Δμ(${e})</span>
+      <span class="lbl" style="width:56px;text-transform:none">Δμ(${e})</span>
       <input type="number" step="0.01" id="dmu-${e}" value="${S.dmu[e].toFixed(4)}"
         ${e===p?"disabled":""} style="flex:1" aria-label="Delta mu ${e}">
       ${e===p?`<span class="muted mono" style="font-size:10px">solved</span>`:""}
@@ -671,7 +733,7 @@ function renderDmuInputs(){
     if(e === p) continue;
     $("dmu-"+e).addEventListener("change", () => {
       const v = parseFloat($("dmu-"+e).value);
-      if(!Number.isFinite(v)) return;
+      if(!Number.isFinite(v) || v === S.dmu[e]) return;
       S.dmu[e] = v;
       // re-solve the pivot from the host equality
       let s = 0;
@@ -694,6 +756,51 @@ function renderFeas(){
   else
     h += `<div class="note">Inside the stability region; ${esc(S.hostFormula)} is the equilibrium phase here.</div>`;
   $("feas").innerHTML = h;
+}
+
+function renderDopants(){
+  const box = $("dop-panel");
+  if(!S.dopants.length){ box.innerHTML = ""; return; }
+  const anionHost = S.elements.some(e => ["O","S","Se","Te","N","F","Cl","Br","I","P","As","Sb"].includes(e));
+  box.innerHTML = S.dopants.map(el => {
+    const st = dopantState(el, S.dmu), set = S.dopSet[el] || {mode:"auto"};
+    const phases = S.dopPhases.filter(p => p.dop === el);
+    const opts = `<option value="auto" ${st.mode==="auto"?"selected":""}>Solubility limit (auto)</option>` +
+      phases.map(p => `<option value="phase:${esc(p.name)}" ${st.mode==="phase"&&set.phase===p.name?"selected":""}>In equilibrium with ${esc(p.name)}</option>`).join("") +
+      `<option value="fixed" ${st.mode==="fixed"?"selected":""}>Fixed Δμ(${esc(el)})</option>`;
+    let notes = "";
+    if(!phases.length)
+      notes += `<div class="note ${anionHost?"warn":""}">Only metallic ${esc(el)} bounds Δμ(${esc(el)}).${anionHost ? ` For a host like ${esc(S.hostFormula)}, ${esc(el)} compounds with the host anion (for example oxides) usually set a much lower limit. Add them to the competing-phase table.` : ""}</div>`;
+    if(st.viol.length)
+      notes += `<div class="note warn"><b>Above the solubility limit.</b><br>` +
+        st.viol.map(l => `${esc(l.name)} would precipitate (exceeded by ${fx(st.v - l.v)} eV)`).join("<br>") + `</div>`;
+    const rows = S.verts.map((v, i) => {
+      const s = dopantState(el, v.dmu);
+      return `<tr${i===S.selVtx?' style="font-weight:600"':""}><td>${String.fromCharCode(65+i)}</td><td class="num">${fx(s.v)}</td><td>${esc(s.src)}</td></tr>`;
+    }).join("");
+    return `<div class="stack" style="gap:6px">
+      <div class="flexline" style="gap:8px"><span class="lbl" style="width:56px;text-transform:none">Δμ(${esc(el)})</span>
+        <span class="mono" style="flex:1">${fx(st.v,4)}</span><span class="muted mono" style="font-size:10px">${esc(st.src)}</span></div>
+      <select id="dop-mode-${el}" aria-label="How Δμ(${esc(el)}) is set">${opts}</select>
+      ${st.mode==="fixed" ? `<input type="number" step="0.01" id="dop-val-${el}" value="${st.v.toFixed(4)}" aria-label="Fixed Δμ ${esc(el)}">` : ""}
+      ${notes}
+      ${S.verts.length ? `<div class="tbl-wrap"><table><thead><tr><th>Vertex</th><th class="num"><span class="nt">Δμ(${esc(el)})</span></th><th>set by</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
+    </div>`;
+  }).join("");
+  for(const el of S.dopants){
+    $("dop-mode-"+el).addEventListener("change", e => {
+      const v = e.target.value;
+      if(v === "auto") S.dopSet[el] = {mode:"auto"};
+      else if(v === "fixed") S.dopSet[el] = {mode:"fixed", value:dopantState(el, S.dmu).v};
+      else S.dopSet[el] = {mode:"phase", phase:v.slice(6)};
+      draw();
+    });
+    $("dop-val-"+el)?.addEventListener("change", e => {
+      const v = numOr(e.target.value, NaN);
+      // Re-rendering removes this input; its blur then fires a second change with the same value.
+      if(Number.isFinite(v) && v !== S.dopSet[el]?.value){ S.dopSet[el] = {mode:"fixed", value:v}; draw(); }
+    });
+  }
 }
 
 function renderLegend(){
@@ -767,7 +874,7 @@ function pickVertex(i){
 }
 function draw(){
   if(!S.valid) return;
-  renderChips(); renderVertexList(); renderDmuInputs(); renderFeas();
+  renderChips(); renderVertexList(); renderDmuInputs(); renderFeas(); renderDopants();
   renderRegion(); renderMsgs();
   if(S.defectReady === false){
     for(const id of ["legend","svg-main","fig-prev","cond-rows","fig-series"]) $(id).innerHTML = "";
@@ -785,15 +892,24 @@ function readSystem(){
   if(!hc) throw Error("Enter a valid host formula, such as ZnO, In2O3 or CuInSe2.");
   if(Object.keys(hc).length < 2 || Object.keys(hc).length > 4) throw Error("Use a host containing 2–4 elements.");
   const els = Object.keys(hc);
+  const dops = parseDopants($("f-dop").value, els);
   const changed = els.join() !== S.elements.join();
+  const refsChanged = changed || dops.join() !== S.dopants.join();
   S.hostDHf = requiredNumber("f-dhf", "Host energy");
-  S.hostCoeff = hc; S.elements = els;
-  if(changed){
-    for(const e of els) if(!(e in S.muRef)) S.muRef[e] = 0;
-    S.axX = els[0]; S.axY = els[1] || els[0];
-    buildMuRefGrid(); buildAxisSelects();
+  S.hostCoeff = hc; S.elements = els; S.dopants = dops;
+  for(const d of Object.keys(S.dopSet)) if(!dops.includes(d)) delete S.dopSet[d];
+  if(refsChanged){
+    // A new element starts with a blank reference (never a silent zero); stale
+    // references from a previous host are dropped.
+    S.muRef = Object.fromEntries([...els, ...dops].map(e => [e, Number.isFinite(S.muRef[e]) ? S.muRef[e] : NaN]));
+    buildMuRefGrid();
   }
-  for(const e of els){
+  if(changed){
+    S.dmu = {};
+    S.axX = els[0]; S.axY = els[1] || els[0];
+    buildAxisSelects();
+  }
+  for(const e of [...els, ...dops]){
     const inp = $("mu-"+e);
     if(inp) S.muRef[e] = numOr(inp.value, NaN);
   }
@@ -804,15 +920,26 @@ function normalizeEnergy(value,type,basis,units,comp,refs){
   if(basis==='cell'){const n=numOr(units,NaN);if(!(n>0))throw Error('Enter positive formula units per cell.');value/=n;}
   else if(basis==='atom')value*=Object.values(comp).reduce((a,b)=>a+b,0);
   else if(basis!=='formula')throw Error('Invalid energy basis.');
-  if(type==='total')for(const [e,n] of Object.entries(comp)){if(!Number.isFinite(refs[e]))throw Error(`Enter reference energy for ${e}.`);value-=n*refs[e];}
+  if(type==='total')for(const [e,n] of Object.entries(comp)){if(!n)continue;if(!Number.isFinite(refs[e]))throw Error(`Enter reference energy for ${e}.`);value-=n*refs[e];}
   else if(type!=='formation')throw Error('Invalid energy type.');
   if(!Number.isFinite(value))throw Error('Invalid normalized energy.');return value;
 }
+function parseDopants(text, hostEls){
+  const list = String(text || "").split(/[\s,;]+/).filter(Boolean);
+  for(const el of list){
+    if(!ELEMENTS.has(el)) throw Error(`Dopant '${el}' is not an element symbol.`);
+    if(hostEls.includes(el)) throw Error(`${el} is a host element, not an extrinsic dopant.`);
+  }
+  if(new Set(list).size !== list.length) throw Error("Each dopant should be listed once.");
+  if(list.length > 4) throw Error("Use at most four extrinsic dopants.");
+  return list;
+}
 function buildMuRefGrid(){
-  $("muref-grid").innerHTML = S.elements.map(e => `
-    <div class="field"><label for="mu-${e}">${e}</label>
-      <input type="number" step="0.0001" id="mu-${e}" value="${Number.isFinite(S.muRef[e]) ? S.muRef[e] : ''}"></div>`).join("");
-  S.elements.forEach(e => $("mu-"+e).addEventListener("change", recompute));
+  const all = [...S.elements, ...S.dopants];
+  $("muref-grid").innerHTML = all.map(e => `
+    <div class="field"><label for="mu-${e}">${e}${S.dopants.includes(e) ? ' <span class="muted">(dopant)</span>' : ''}</label>
+      <input type="number" step="0.0001" id="mu-${e}" placeholder="required for defects" value="${Number.isFinite(S.muRef[e]) ? S.muRef[e] : ''}"></div>`).join("");
+  all.forEach(e => $("mu-"+e).addEventListener("change", recompute));
 }
 function buildAxisSelects(){
   for(const [id, key] of [["ax-x","axX"], ["ax-y","axY"]]){
@@ -830,7 +957,7 @@ const EXPORT_IDS = ["b-svg", "b-tsv", "b-png", "b-png6", "b-svgdl", "b-agr", "b-
 function invalidate(message){
   S.valid = false;
   $("input-status").innerHTML = `<div class="note bad"><b>Inputs need attention.</b> ${esc(message)} Results are cleared until the inputs are corrected.</div>`;
-  for(const id of ["chips","vtx-list","dmu-inputs","feas","legend","svg-region","svg-main","fig-prev","cond-rows","fig-series","main-msg"]) $(id).innerHTML = "";
+  for(const id of ["chips","vtx-list","dmu-inputs","feas","dop-panel","legend","svg-region","svg-main","fig-prev","cond-rows","fig-series","main-msg"]) $(id).innerHTML = "";
   for(const id of ["tbl-lv","tbl-edge"]) $(id).querySelector("tbody").innerHTML = "";
   $("region-dim").textContent = "Calculation paused";
   $("cond-tag").textContent = "";
@@ -840,12 +967,14 @@ function recompute(){
  for(const id of ['tip-region','tip-main']){const tip=$(id);tip.classList.remove('on');tip.innerHTML='';}
  try {
   readSystem();
-  const pres = loadPhases($("ta-ph").value, S.elements);
-  S.phases = pres.list;
+  const pres = loadPhases($("ta-ph").value, S.elements, S.dopants);
+  S.phases = pres.list; S.dopPhases = pres.dopList;
   if(pres.errs.length) throw Error(pres.errs.join("; "));
+  for(const [el, set] of Object.entries(S.dopSet))
+    if(set.mode === "phase" && !S.dopPhases.some(p => p.dop === el && p.name === set.phase)) S.dopSet[el] = {mode:"auto"};
   S.defects = []; S.errors = []; S.defectReady = false;
   try {
-    const dres = $("ta-def").value.trim() ? loadDefects($("ta-def").value, S.elements) : {list:[],errs:[]};
+    const dres = $("ta-def").value.trim() ? loadDefects($("ta-def").value, S.elements, S.dopants) : {list:[],errs:[]};
     if(dres.errs.length) throw Error(dres.errs.join("; "));
     if(dres.list.length){
       S.bulk = requiredNumber("f-bulk", "Bulk supercell energy");
@@ -853,6 +982,9 @@ function recompute(){
       S.gap = requiredNumber("f-gap", "Band gap");
       if(S.gap <= 0) throw Error("The band gap must be greater than zero.");
       for(const e of S.elements) S.muRef[e] = requiredNumber("mu-"+e, `Reference for ${e}`);
+      // Dopant references are needed only for dopants that appear in a defect.
+      for(const e of S.dopants) if(dres.list.some(d => d.dn[e]))
+        S.muRef[e] = requiredNumber("mu-"+e, `Reference for dopant ${e}`);
       S.defects = dres.list; S.defectReady = true;
     }
   } catch(err){ S.errors = [err.message]; }
@@ -877,7 +1009,7 @@ function recompute(){
 
 function loadDemo(){
   $('host-type').value='formation';$('host-basis').value='formula';$('host-units').value=1;
-  $("f-host").value = DEMO.host; $("f-dhf").value = DEMO.dHf;
+  $("f-host").value = DEMO.host; $("f-dhf").value = DEMO.dHf; $("f-dop").value = ""; S.dopSet = {};
   $("f-bulk").value = DEMO.bulk; $("f-vbm").value = DEMO.vbm; $("f-gap").value = DEMO.gap;
   S.muRef = {...DEMO.muRef}; S.elements = [];
   $("ta-def").value = DEMO.defects; $("ta-ph").value = DEMO.phases;
@@ -940,7 +1072,7 @@ function toChemicalSession(){
 }
 
 /* ============================================================ wiring */
-["f-host","f-dhf","f-bulk","f-vbm","f-gap"].forEach(id =>
+["f-host","f-dop","f-dhf","f-bulk","f-vbm","f-gap"].forEach(id =>
   $(id).addEventListener("change", recompute));
 $("b-def").addEventListener("click", () => { $("src-tag").textContent = "your data"; recompute(); });
 $("b-ph").addEventListener("click",  () => { $("src-tag").textContent = "your data"; recompute(); });
@@ -996,8 +1128,9 @@ $("b-tsv").addEventListener("click", async e => {
     for(const L of envelope(linesFor(n), S.gap).levels)
       rows.push([n, L.q1, L.q2, L.eps.toFixed(4), (S.gap-L.eps).toFixed(4), L.ef.toFixed(4)]);
   }
+  const M = fullDmu(S.dmu);
   const head = `# ${S.hostFormula}  Delta-mu: ` +
-    S.elements.map(el => `${el}=${S.dmu[el].toFixed(4)}`).join(" ");
+    [...S.elements, ...S.dopants].map(el => `${el}=${M[el].toFixed(4)}`).join(" ");
   try { await navigator.clipboard.writeText(head + "\n" + rows.map(r => r.join("\t")).join("\n"));
         flash(e.target, "Copied"); }
   catch { flash(e.target, "Copy blocked"); }
@@ -1155,25 +1288,68 @@ function publicationModel(){
   const mR = fs*0.9;
   const mT = fs*0.9 + legendH;
   const mB = tp + digitH + xp + xCap + xDrop;
-  const pw = (W - mL - mR - (n-1)*gp)/n;
+  // Line-end labels sit outside each frame, in a reserved strip, so they never
+  // cover the curves or get clipped at the panel edge.
+  const endFs = fs*0.92, endPad = fs*0.35;
+  const labW = F.labelMode === "end"
+    ? Math.max(0, ...panels.flatMap(P => P.series.filter(s => s.segs.length).map(s => richWidth(s.label, endFs)))) + endPad + fs*0.2
+    : 0;
+  const pw = (W - mL - mR - (n-1)*gp - n*labW)/n;
   const ph = H - mT - mB;
+  const stride = pw + labW + gp;
   const tkMaj = fs*0.55, tkMin = fs*0.30;
   const aw = Math.max(0.4, F.axisLW);       // frame and ticks, independent of the data lines
   S.__geo = {mL, mR, mT, mB, pw, ph, gp, n, W, H, xMaj, yMaj, xMin, yMinT};
   if(!(pw > fs*2) || !(ph > fs*2))
-    throw new Error("no room left for the plot — reduce the label gaps or increase the figure size");
+    throw new Error("no room left for the plot — reduce the label gaps, shorten series labels or increase the figure size");
 
-  return {F,H,W,aw,digitH,fam,fs,gp,hi,legendH,lo,lw,mL,mR,mT,n,panels,ph,pw,tkMaj,tkMin,tp,xCap,xMaj,xMin,xd,xp,yCap,yMaj,yMinT,yd,xStep,yStep};
+  // Shared label layout (figure points), used by both the SVG and Grace exports.
+  panels.forEach((P, p) => {
+    const X0 = mL + p*stride, Y0 = mT;
+    const SX = v => X0 + v/S.gap*pw;
+    const SY = v => Y0 + ph - (v - lo)/(hi - lo)*ph;
+    P.X0 = X0;
+    P.charges = [];
+    const head = [F.letters && n > 1 ? `(${String.fromCharCode(97+p)})` : "", P.cap].filter(Boolean).join(" ");
+    const avoid = head ? [{x0:X0, x1:X0 + fs*0.55 + richWidth(head, fs*0.95) + fs*0.3, y0:Y0, y1:Y0 + fs*1.75}] : [];
+    if(F.cl){
+      const placed = [];
+      for(const s of P.series) for(const sg of s.segs){
+        if(SX(sg.x1) - SX(sg.x0) < fs*2.2) continue;
+        const spot = labelSpot(sg, SX, SY, placed,
+          {w:fs*1.9, h:fs*1.05, above:lw + fs*0.45, below:lw + fs*1.15, top:Y0 + fs*0.8, bottom:Y0 + ph - fs*0.2, avoid});
+        if(spot) P.charges.push({x:spot[0], y:spot[1], t:sgn(sg.q), c:s.color});
+      }
+    }
+    P.ends = [];
+    if(F.labelMode === "end"){
+      const L = P.series.filter(s => s.segs.length).map(s => {
+        const sg = s.segs[s.segs.length-1];
+        return {t:s.label, c:s.color, y:SY(sg.A + sg.q*sg.x1)};
+      }).sort((a, b) => a.y - b.y);
+      const MIN = fs*1.15, top = Y0 + fs*0.35, bottom = Y0 + ph - fs*0.1;
+      for(const q of L) q.y = Math.max(top, Math.min(bottom, q.y));
+      for(let i = 1; i < L.length; i++) if(L[i].y - L[i-1].y < MIN) L[i].y = L[i-1].y + MIN;
+      if(L.length){
+        const over = L[L.length-1].y - bottom;
+        if(over > 0) for(const q of L) q.y -= over;
+        for(let i = L.length-2; i >= 0; i--) if(L[i+1].y - L[i].y < MIN) L[i].y = L[i+1].y - MIN;
+      }
+      for(const q of L) P.ends.push({...q, x:X0 + pw + endPad, base:q.y + endFs*0.33});
+    }
+  });
+
+  return {F,H,W,aw,digitH,endFs,fam,fs,gp,hi,labW,legendH,lo,lw,mL,mR,mT,n,panels,ph,pw,stride,tkMaj,tkMin,tp,xCap,xMaj,xMin,xd,xp,yCap,yMaj,yMinT,yd,xStep,yStep};
 }
 
 function buildFigureSVG(){
-  const {F,H,W,aw,digitH,fam,fs,gp,hi,legendH,lo,lw,mL,mR,mT,n,panels,ph,pw,tkMaj,tkMin,tp,xCap,xMaj,xMin,xd,xp,yCap,yMaj,yMinT,yd,xStep,yStep} = publicationModel();
+  const {F,H,W,aw,digitH,endFs,fam,fs,gp,hi,labW,legendH,lo,lw,mL,mR,mT,n,panels,ph,pw,stride,tkMaj,tkMin,tp,xCap,xMaj,xMin,xd,xp,yCap,yMaj,yMinT,yd,xStep,yStep} = publicationModel();
   const AX = "#000000";
   let g = "";
   if(F.white) g += `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff"/>`;
 
   for(let p = 0; p < n; p++){
-    const X0 = mL + p*(pw + gp), Y0 = mT;
+    const X0 = mL + p*stride, Y0 = mT;
     const SX = v => X0 + v/S.gap*pw;
     const SY = v => Y0 + ph - (v - lo)/(hi - lo)*ph;
     const P = panels[p];
@@ -1181,7 +1357,6 @@ function buildFigureSVG(){
     g += `<clipPath id="${cid}"><rect x="${X0}" y="${Y0}" width="${pw}" height="${ph}"/></clipPath>`;
 
     g += `<g clip-path="url(#${cid})">`;
-    const placed = [];                     // charge-label collision guard
     for(const s of P.series){
       const pts = [];
       s.segs.forEach((sg, i) => {
@@ -1195,17 +1370,11 @@ function buildFigureSVG(){
       if(F.mk) for(const L of s.levels)
         g += `<circle cx="${SX(L.eps).toFixed(2)}" cy="${SY(L.ef).toFixed(2)}"
                r="${Math.max(1.1, lw*1.25).toFixed(2)}" fill="${s.color}"/>`;
-      if(F.cl) for(const sg of s.segs){
-        if(SX(sg.x1) - SX(sg.x0) < fs*2.2) continue;
-        const xm = (sg.x0 + sg.x1)/2;
-        const tx = SX(xm), ty = SY(sg.A + sg.q*xm) - lw - fs*0.45;
-        if(placed.some(q => Math.abs(q[0]-tx) < fs*1.9 && Math.abs(q[1]-ty) < fs*1.05)) continue;
-        placed.push([tx, ty]);
-        g += `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}"
-               font-family="${fam}" font-size="${(fs*0.82).toFixed(2)}" fill="${s.color}"
-               text-anchor="middle"${HALO(fs*0.26)}>${esc(sgn(sg.q))}</text>`;
-      }
     }
+    for(const c of P.charges)
+      g += `<text x="${c.x.toFixed(2)}" y="${c.y.toFixed(2)}"
+             font-family="${fam}" font-size="${(fs*0.82).toFixed(2)}" fill="${c.c}"
+             text-anchor="middle"${HALO(fs*0.26)}>${esc(c.t)}</text>`;
     g += `</g>`;
 
     // Frame and ticks are axis-aligned hairlines. They are collected into their
@@ -1227,7 +1396,7 @@ function buildFigureSVG(){
     // Every tick keeps its label. Where panels sit close together the outermost
     // labels would run into each other across the gap, so instead of dropping one
     // they are anchored to the frame edge — the number stays, it just tucks inward.
-    const tight = n > 1 && gp < fs*1.9;
+    const tight = n > 1 && gp + labW < fs*1.9;
     xMaj.forEach((t, k) => {
       axg += tick(SX(t), Y0+ph, SX(t), Y0+ph-tkMaj); if(F.frame) axg += tick(SX(t), Y0, SX(t), Y0+tkMaj);
       let anchor = "middle";
@@ -1251,24 +1420,10 @@ function buildFigureSVG(){
       g += `<text x="${(X0+fs*0.55).toFixed(2)}" y="${(Y0+fs*1.35).toFixed(2)}" font-family="${fam}"
              font-size="${(fs*0.95).toFixed(2)}" fill="${AX}"${HALO(fs*0.30)}>${richSVG(head.join(" "), fs*0.95)}</text>`;
 
-    // line-end labels
-    if(F.labelMode === "end"){
-      const L = P.series.filter(s => s.segs.length).map(s => {
-        const sg = s.segs[s.segs.length-1];
-        return {t:s.label, c:s.color, y:SY(sg.A + sg.q*sg.x1)};
-      }).sort((a,b) => a.y - b.y);
-      const MIN = fs*1.32;
-      for(let i = 1; i < L.length; i++) if(L[i].y - L[i-1].y < MIN) L[i].y = L[i-1].y + MIN;
-      if(L.length){
-        const over = L[L.length-1].y - (Y0 + ph - fs*0.35);
-        if(over > 0) for(const q of L) q.y -= over;
-        const under = (Y0 + fs*1.0) - L[0].y;
-        if(under > 0) for(const q of L) q.y += under;
-      }
-      for(const q of L)
-        g += `<text x="${(X0+pw-fs*0.4).toFixed(2)}" y="${(q.y - fs*0.42).toFixed(2)}" font-family="${fam}"
-               font-size="${(fs*0.92).toFixed(2)}" fill="${q.c}" text-anchor="end"${HALO(fs*0.30)}>${richSVG(q.t, fs*0.92)}</text>`;
-    }
+    // line-end labels, outside the frame
+    for(const q of P.ends)
+      g += `<text x="${q.x.toFixed(2)}" y="${q.base.toFixed(2)}" font-family="${fam}"
+             font-size="${endFs.toFixed(2)}" fill="${q.c}" text-anchor="start">${richSVG(q.t, endFs)}</text>`;
   }
 
   // shared legend
@@ -1311,7 +1466,7 @@ function graceText(value){
     : (k==="sub" ? "\\s" : "\\S")+clean(t)+"\\N").join("") + '"';
 }
 function buildFigureAGR(){
-  const {F,W,H,mL,mT,pw,ph,gp,panels,lo,hi,xStep,yStep,xd,yd} = publicationModel();
+  const {F,W,H,mL,mT,pw,ph,gp,panels,lo,hi,xStep,yStep,xd,yd,stride} = publicationModel();
   const out=["# Grace project file", "@version 50125"], data=[];
   const cmd=t=>out.push("@"+t);
   const unit=Math.min(W,H), font=F.font==="serif"?0:4, size=F.fs/(0.025*unit);
@@ -1324,7 +1479,8 @@ function buildFigureAGR(){
     cmd(`map color ${id} to (${rgb.join(", ")}) , "series${id}"`);
   }
   panels.forEach((panel,p)=>{
-    const left=mL+p*(pw+gp), bottom=H-mT-ph;
+    const left=mL+p*stride, bottom=H-mT-ph;
+    const wx=x=>(x-left)/pw*S.gap, wy=y=>lo+(mT+ph-y)/ph*(hi-lo);   // figure points → world
     cmd(`g${p} on`); cmd(`with g${p}`);
     cmd(`world 0, ${lo}, ${S.gap}, ${hi}`);
     cmd(`view ${left/unit}, ${bottom/unit}, ${(left+pw)/unit}, ${(bottom+ph)/unit}`);
@@ -1360,13 +1516,9 @@ function buildFigureAGR(){
       const points=series.segs.map(s=>[s.x0,s.A+s.q*s.x0]);
       const last=series.segs.at(-1); points.push([last.x1,last.A+last.q*last.x1]); set(points,false);
       if(F.mk && series.levels.length) set(series.levels.map(l=>[l.eps,l.ef]),true);
-      if(F.labelMode==="end") label(series.label,.99*S.gap,Math.max(lo,Math.min(hi,points.at(-1)[1])),color,2);
-      if(F.cl) for(const s of series.segs){
-        if((s.x1-s.x0)*pw/S.gap<F.fs*2.2) continue;
-        const x=(s.x1+s.x0)/2,y=s.A+s.q*x;
-        if(y>=lo && y<=hi) label(sgn(s.q),x,y+.015*(hi-lo),color,1);
-      }
     });
+    for(const q of panel.ends) label(q.t,wx(q.x),wy(q.base),colors.get(q.c),0);
+    for(const c of panel.charges) label(c.t,wx(c.x),wy(c.y),colors.get(c.c),1);
   });
   return [...out,...data,""].join("\n");
 }
@@ -1582,7 +1734,8 @@ $("b-save-inputs").addEventListener("click", () => {
   const data = {format:"defect-formation-explorer",version:1,
     inputs:Object.fromEntries(INPUT_IDS.map(id=>[id,$(id).value])),
     hostEnergy:{type:$('host-type').value,basis:$('host-basis').value,units:$('host-units').value},
-    references:Object.fromEntries(S.elements.map(el=>[el,$("mu-"+el).value])),
+    references:Object.fromEntries([...S.elements, ...S.dopants].map(el=>[el,$("mu-"+el).value])),
+    dopants:$("f-dop").value, dopantSettings:JSON.parse(JSON.stringify(S.dopSet)),
     dmu:{...S.dmu}};
   directSave(figName("json"),new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
 });
@@ -1600,7 +1753,7 @@ $("u-inputs").addEventListener("change", async e => {
       $('host-basis').value=data.model.target.basis || 'formula';
       $('host-units').value=data.model.target.units ?? 1;
       $("ta-ph").value='phase,dHf\n'+imported.phases.map(p=>`${p.name},${p.dHf}`).join('\n');
-      for(const id of ['ta-def','f-bulk','f-vbm','f-gap']) $(id).value='';
+      for(const id of ['ta-def','f-bulk','f-vbm','f-gap','f-dop']) $(id).value=''; S.dopSet={};
       S.elements=[]; S.muRef=imported.refs; S.chemicalOwn=imported.own;
       S.dmu={}; S.selVtx=0; S.hidden.clear(); S.fig.condsTouched=false;
       recompute();
@@ -1619,7 +1772,9 @@ $("u-inputs").addEventListener("change", async e => {
     if(!comp) throw Error("Invalid host formula.");
     INPUT_IDS.forEach(id=>$(id).value=data.inputs[id]);
     $('host-type').value=data.hostEnergy?.type||'formation';$('host-basis').value=data.hostEnergy?.basis||'formula';$('host-units').value=data.hostEnergy?.units||1;
-    S.elements=[]; S.muRef=Object.fromEntries(Object.keys(comp).map(el=>[el,numOr(data.references?.[el],NaN)]));
+    $("f-dop").value = typeof data.dopants === "string" ? data.dopants : "";
+    S.dopSet = data.dopantSettings && typeof data.dopantSettings === "object" ? JSON.parse(JSON.stringify(data.dopantSettings)) : {};
+    S.elements=[]; S.dopants=[]; S.muRef=Object.fromEntries(Object.entries(data.references || {}).map(([el,v])=>[el,numOr(v,NaN)]));
     S.selVtx=0; S.hidden.clear(); S.fig.condsTouched=false;
     recompute();
     if(S.valid && S.elements.every(el=>Number.isFinite(data.dmu?.[el]))){
@@ -1631,7 +1786,7 @@ $("u-inputs").addEventListener("change", async e => {
   } catch(err){ $("input-status").textContent=`Could not open inputs: ${err.message}`; }
   e.target.value="";
 });
-for(const id of [...INPUT_IDS,"muref-grid"]){
+for(const id of [...INPUT_IDS,"f-dop","muref-grid"]){
   $(id).addEventListener("input", () => {
     $("src-tag").textContent="your data";
     $("data-notice").textContent="User-supplied data. Results depend on your energy references and included phases. Save inputs to keep a local copy; figure styling is not included.";
