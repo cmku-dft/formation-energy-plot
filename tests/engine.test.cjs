@@ -201,3 +201,30 @@ test('publication labels: line-end labels sit outside the frame, charge labels d
  assert.doesNotMatch(r('buildFigureAGR()'),/NaN|Infinity/);
  assert.doesNotMatch(r('buildFigureSVG()'),/NaN|Infinity/);
 });
+test('bundled ZnO examples load and give the documented limits and levels',()=>{
+ const r=engine();
+ for(const [file,dop] of [['examples/ZnO_native_defects.json',[]],['examples/ZnO_Al_doped.json',['Al']]]){
+  const data=JSON.parse(fs.readFileSync(file,'utf8'));
+  assert.equal(data.format,'defect-formation-explorer'); assert.equal(data.dopants,dop.join(''));
+  host(r,data.inputs['f-host'],Number(data.inputs['f-dhf']));
+  r(`var D=${JSON.stringify(data)}; S.dopants=${JSON.stringify(dop)}; S.dopSet={}; S.bulk=+D.inputs["f-bulk"]; S.vbm=+D.inputs["f-vbm"]; S.gap=+D.inputs["f-gap"];
+     S.muRef=Object.fromEntries(Object.entries(D.references).map(([k,v])=>[k,+v]));
+     var P=loadPhases(D.inputs["ta-ph"],S.elements,S.dopants), L=loadDefects(D.inputs["ta-def"],S.elements,S.dopants);
+     S.dopPhases=P.dopList; S.defects=L.list;`);
+  assert.equal(r('P.errs.length+L.errs.length'),0);
+  const at=(name,vtx,EF)=>r(`(()=>{const v=S.verts.find(v=>v.act.includes(${JSON.stringify(vtx)})).dmu; const e=envelope(linesFor(${JSON.stringify(name)},v),S.gap); const s=e.segs.find(s=>s.x0<=${EF}+1e-9&&s.x1>=${EF}-1e-9); return s.A+s.q*${EF};})()`);
+  near(at('V_O','Zn elemental limit',3.4),.9); near(at('V_O','O elemental limit',3.4),4.5);
+  near(at('V_Zn','O elemental limit',3.4),1.4); near(at('Zn_i','Zn elemental limit',0),-1.4);
+  assert.deepEqual([...r('envelope(linesFor("V_O"),S.gap).levels.map(l=>+l.eps.toFixed(6))')],[2.4]);
+  assert.deepEqual([...r('envelope(linesFor("V_Zn"),S.gap).levels.map(l=>+l.eps.toFixed(6))')],[.9,1.6]);
+  if(dop.length){
+   near(r('dopantState("Al",S.verts.find(v=>v.act.includes("Zn elemental limit")).dmu).v'),-3.3);
+   near(r('dopantState("Al",S.verts.find(v=>v.act.includes("O elemental limit")).dmu).v'),-8.7);
+   near(at('Al_Zn','Zn elemental limit',3.4),.8);
+   // Uncommenting the spinel makes it the limit, 0.2 eV below Al2O3 at both ends
+   r('S.dopPhases=loadPhases(D.inputs["ta-ph"].replace("# ZnAl2O4","ZnAl2O4"),S.elements,S.dopants).dopList;');
+   near(r('dopantState("Al",S.verts.find(v=>v.act.includes("Zn elemental limit")).dmu).v'),-3.5);
+   assert.equal(r('dopantState("Al",S.verts.find(v=>v.act.includes("O elemental limit")).dmu).src'),'ZnAl2O4');
+  }
+ }
+});

@@ -14,6 +14,13 @@ A browser-based app for plotting DFT defect formation energies and thermodynamic
 6. Use the publication controls for one to three panels, colors, labels, size, ticks and fonts. Line-end labels are placed in a reserved strip to the right of each panel so they never cover the curves; charge labels are moved along or below their segment to avoid one another and the panel caption. Download a native XmGrace project with **Grace (.agr)**, editable SVG, or PNG at 300/600 dpi. Open the AGR in XmGrace with **File → Open**. Each publication panel is a graph, each visible defect envelope is a separate XY set, and enabled transition markers are separate point sets. Edit line styles in Set appearance and tick spacing or axis labels in Axis properties. Native Grace fonts and label placement can differ from the browser preview. PNG files carry both the requested pixel size and resolution metadata.
 7. **Save inputs** downloads a JSON file containing system values, dopants and their settings, reference energies, input tables and the selected chemical potentials. **Open inputs** restores it (files saved by earlier versions still open). Figure styling is not included. Reloading the page loads the example; inputs are not automatically stored.
 
+### Bundled examples
+
+The `examples/` folder holds input files in the **Save inputs** format. Load them with the buttons under **Examples and reset**, or download one and open it with **Open inputs / Lab session**. All numbers are illustrative: they were chosen to show the format and typical behaviour, not taken from a real calculation.
+
+- `ZnO_native_defects.json`: V_O (deep, negative-U ε(2+/0)), V_Zn (acceptor, ε(0/−) and ε(−/2−)) and Zn_i (shallow donor), Zn-rich and O-rich limits.
+- `ZnO_Al_doped.json`: the same defects plus Al_Zn and Al_i, with Δμ_Al set by Al₂O₃ (`Δμ_Al = [ΔHf(Al2O3) − 3Δμ_O]/2`). The phase table contains a commented-out `ZnAl2O4` line. Remove the `#` and press **Calculate** to see the spinel become the limiting phase. Next to ZnO it is the real solubility limit, because ZnO + Al₂O₃ → ZnAl₂O₄ is exothermic.
+
 ### Defect table example (illustrative values only)
 
 ```csv

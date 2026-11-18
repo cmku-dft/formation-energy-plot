@@ -701,7 +701,7 @@ function renderChips(){
     : "custom Δμ") + S.dopants.map(el => `; Δμ(${el}) from ${dopantState(el, S.dmu).src}`).join("");
   $("tag-host").textContent = S.elements.join(" ");
   $("tag-def").textContent = `${S.defects.length} rows`;
-  $("tag-ph").textContent = `${S.phases.length} phases`;
+  $("tag-ph").textContent = `${S.phases.length} phases` + (S.dopPhases.length ? ` + ${S.dopPhases.length} dopant` : "");
   $("region-dim").textContent = S.elements.length <= 2
     ? "1-D line segment"
     : S.elements.length === 3 ? "2-D polygon"
@@ -1766,26 +1766,44 @@ $("u-inputs").addEventListener("change", async e => {
       e.target.value='';
       return;
     }
-    if(data.format !== "defect-formation-explorer" || data.version !== 1 ||
-      !INPUT_IDS.every(id=>typeof data.inputs?.[id] === "string")) throw Error("Choose an input file saved by this app.");
-    const comp=parseFormula(data.inputs["f-host"]);
-    if(!comp) throw Error("Invalid host formula.");
-    INPUT_IDS.forEach(id=>$(id).value=data.inputs[id]);
-    $('host-type').value=data.hostEnergy?.type||'formation';$('host-basis').value=data.hostEnergy?.basis||'formula';$('host-units').value=data.hostEnergy?.units||1;
-    $("f-dop").value = typeof data.dopants === "string" ? data.dopants : "";
-    S.dopSet = data.dopantSettings && typeof data.dopantSettings === "object" ? JSON.parse(JSON.stringify(data.dopantSettings)) : {};
-    S.elements=[]; S.dopants=[]; S.muRef=Object.fromEntries(Object.entries(data.references || {}).map(([el,v])=>[el,numOr(v,NaN)]));
-    S.selVtx=0; S.hidden.clear(); S.fig.condsTouched=false;
-    recompute();
-    if(S.valid && S.elements.every(el=>Number.isFinite(data.dmu?.[el]))){
-      const f=feasibility(data.dmu);
-      if(Math.abs(f.hostResid)<1e-6){ S.dmu={...data.dmu}; S.selVtx=S.verts.findIndex(v=>S.elements.every(el=>Math.abs(v.dmu[el]-S.dmu[el])<1e-6)); draw(); }
-    }
+    applySavedInputs(data);
     $("src-tag").textContent="saved inputs";
     $("data-notice").textContent="User-supplied data. Results depend on your energy references and included phases. Save inputs to keep a local copy; figure styling is not included.";
   } catch(err){ $("input-status").textContent=`Could not open inputs: ${err.message}`; }
   e.target.value="";
 });
+// Restore a file written by "Save inputs" (also used by the bundled examples).
+function applySavedInputs(data){
+  if(data.format !== "defect-formation-explorer" || data.version !== 1 ||
+    !INPUT_IDS.every(id=>typeof data.inputs?.[id] === "string")) throw Error("Choose an input file saved by this app.");
+  const comp=parseFormula(data.inputs["f-host"]);
+  if(!comp) throw Error("Invalid host formula.");
+  INPUT_IDS.forEach(id=>$(id).value=data.inputs[id]);
+  $('host-type').value=data.hostEnergy?.type||'formation';$('host-basis').value=data.hostEnergy?.basis||'formula';$('host-units').value=data.hostEnergy?.units||1;
+  $("f-dop").value = typeof data.dopants === "string" ? data.dopants : "";
+  S.dopSet = data.dopantSettings && typeof data.dopantSettings === "object" ? JSON.parse(JSON.stringify(data.dopantSettings)) : {};
+  S.elements=[]; S.dopants=[]; S.muRef=Object.fromEntries(Object.entries(data.references || {}).map(([el,v])=>[el,numOr(v,NaN)]));
+  S.selVtx=0; S.hidden.clear(); S.fig.condsTouched=false;
+  recompute();
+  if(S.valid && S.elements.every(el=>Number.isFinite(data.dmu?.[el]))){
+    const f=feasibility(data.dmu);
+    if(Math.abs(f.hostResid)<1e-6){ S.dmu={...data.dmu}; S.selVtx=S.verts.findIndex(v=>S.elements.every(el=>Math.abs(v.dmu[el]-S.dmu[el])<1e-6)); draw(); }
+  }
+}
+// Bundled examples in examples/ (illustrative numbers, saved-inputs format).
+async function loadExample(file, label){
+  try {
+    const res = await fetch(`examples/${file}`, {cache:"no-cache"});
+    if(!res.ok) throw Error(`HTTP ${res.status}`);
+    applySavedInputs(await res.json());
+    $("src-tag").textContent = label;
+    $("data-notice").textContent = `${label}: illustrative numbers that show the input format, not results from a real calculation. Replace them with your own consistent DFT energies.`;
+  } catch(err){
+    $("input-status").innerHTML = `<div class="note bad">Could not load the example (${esc(err.message)}). Examples need the app to be served over http(s); you can also open the file from the examples folder with Open inputs.</div>`;
+  }
+}
+$("b-ex-zno").addEventListener("click", () => loadExample("ZnO_native_defects.json", "ZnO native-defect example"));
+$("b-ex-znoal").addEventListener("click", () => loadExample("ZnO_Al_doped.json", "ZnO:Al example"));
 for(const id of [...INPUT_IDS,"f-dop","muref-grid"]){
   $(id).addEventListener("input", () => {
     $("src-tag").textContent="your data";

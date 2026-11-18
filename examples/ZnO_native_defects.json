@@ -1,0 +1,28 @@
+{
+  "format": "defect-formation-explorer",
+  "version": 1,
+  "inputs": {
+    "f-host": "ZnO",
+    "f-dhf": "-3.6",
+    "f-bulk": "-330.4521",
+    "f-vbm": "2",
+    "f-gap": "3.4",
+    "ta-def": "# ILLUSTRATIVE numbers only (not from a real calculation). 72-atom ZnO supercell, energies in eV.\ndefect,charge,E_tot,E_corr,Zn,O\nV_O,2,-330.4221,0.60,0,-1\nV_O,1,-325.3721,0.15,0,-1\nV_O,0,-321.0221,0.00,0,-1\nV_Zn,0,-319.8881,0.00,-1,0\nV_Zn,-1,-317.1381,0.15,-1,0\nV_Zn,-2,-313.9881,0.60,-1,0\nZn_i,2,-337.7161,0.60,1,0\nZn_i,1,-331.6661,0.15,1,0\nZn_i,0,-325.8161,0.00,1,0",
+    "ta-ph": ""
+  },
+  "hostEnergy": {
+    "type": "formation",
+    "basis": "formula",
+    "units": "1"
+  },
+  "references": {
+    "Zn": "-1.2640",
+    "O": "-4.9300"
+  },
+  "dopants": "",
+  "dopantSettings": {},
+  "dmu": {
+    "Zn": 0,
+    "O": -3.6
+  }
+}
