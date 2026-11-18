@@ -1186,9 +1186,14 @@ function wireUpload(inputId, taId){
 wireUpload("u-def", "ta-def");
 wireUpload("u-ph", "ta-ph");
 
-function flash(btn, txt){
-  const old = btn.textContent; btn.textContent = txt;
-  setTimeout(() => btn.textContent = old, 1400);
+// Show a short status on a button, then return to its real label. The label is
+// remembered once, so back-to-back messages ("Rendering…" then "Downloaded")
+// can never leave a temporary message behind as the button's text.
+function flash(btn, txt, ms = 1400){
+  if(!btn.dataset.label) btn.dataset.label = btn.textContent;
+  clearTimeout(btn._flashTimer);
+  btn.textContent = txt;
+  btn._flashTimer = ms > 0 ? setTimeout(() => { btn.textContent = btn.dataset.label; }, ms) : null;
 }
 $("b-svg").addEventListener("click", async e => {
   const clone = $("svg-main").cloneNode(true);
@@ -1775,13 +1780,18 @@ async function saveFile(filename, data, btn){
   directSave(filename, data); flash(btn, "Downloaded"); figMsg("");
 }
 async function exportPNG(dpi, btn){
-  flash(btn, "Rendering…");
+  if(btn.disabled) return;
+  flash(btn, "Rendering…", 0);           // stays until rendering finishes
+  btn.disabled = true;
   try {
     const blob = await rasterize(dpi);
     if(!blob) throw new Error("empty image");
     await saveFile(figName("png"), blob, btn);
   } catch(err){
+    flash(btn, "Failed");
     figMsg(`PNG export failed: ${esc(err.message)}. The SVG export is unaffected.`, "warn");
+  } finally {
+    btn.disabled = false;
   }
 }
 $("b-png").addEventListener("click", e => exportPNG(300, e.target));
