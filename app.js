@@ -869,9 +869,15 @@ function renderDnSummary(){
   const seen = new Map();
   for(const d of S.defects) if(!seen.has(d.name)) seen.set(d.name, d);
   const label = {"name":"from name", "columns, match name":"columns ✓ name", "columns":"columns (name not in standard notation)"};
+  // Pair each Δn with the chemical potential it multiplies at the selected condition.
+  const M = S.valid && S.elements.every(e => Number.isFinite(S.dmu[e])) ? fullDmu(S.dmu) : null;
+  const cond = S.verts[S.selVtx] ? `vertex ${String.fromCharCode(65 + S.selVtx)}` : "custom Δμ";
+  const muText = dn => M ? Object.entries(dn).filter(([, n]) => n).map(([el, n]) =>
+      `Δμ(${el}) ${fx(M[el], 2)}` + (S.dopants.includes(el) ? ` from ${dopantState(el, S.dmu).src}` : "")).join(", ") : "";
   $("dn-summary").innerHTML = seen.size
-    ? `<div class="lbl" style="margin-bottom:4px">Δn used</div>` +
-      [...seen.values()].map(d => `<div class="mono" style="font-size:13.5px">${esc(d.name)}: ${esc(fmtDn(d.dn))} <span class="muted">· ${esc(label[d.dnSource] || d.dnSource)}</span></div>`).join("")
+    ? `<div class="lbl" style="margin-bottom:4px">Δn used, with Δμ at ${esc(cond)} (eV)</div>` +
+      [...seen.values()].map(d => `<div style="margin-top:4px"><div class="mono" style="font-size:13.5px">${esc(d.name)}: ${esc(fmtDn(d.dn))} <span class="muted">· ${esc(label[d.dnSource] || d.dnSource)}</span></div>` +
+        (muText(d.dn) ? `<div class="muted mono" style="font-size:12.5px">${esc(muText(d.dn))}</div>` : "") + `</div>`).join("")
     : "";
   $("dn-summary").hidden = !seen.size;
 }
@@ -1186,9 +1192,14 @@ function wireUpload(inputId, taId){
 wireUpload("u-def", "ta-def");
 wireUpload("u-ph", "ta-ph");
 
-function flash(btn, txt){
-  const old = btn.textContent; btn.textContent = txt;
-  setTimeout(() => btn.textContent = old, 1400);
+// Show a short status on a button, then return to its real label. The label is
+// remembered once, so back-to-back messages ("Rendering…" then "Downloaded")
+// can never leave a temporary message behind as the button's text.
+function flash(btn, txt, ms = 1400){
+  if(!btn.dataset.label) btn.dataset.label = btn.textContent;
+  clearTimeout(btn._flashTimer);
+  btn.textContent = txt;
+  btn._flashTimer = ms > 0 ? setTimeout(() => { btn.textContent = btn.dataset.label; }, ms) : null;
 }
 $("b-svg").addEventListener("click", async e => {
   const clone = $("svg-main").cloneNode(true);
@@ -1775,13 +1786,18 @@ async function saveFile(filename, data, btn){
   directSave(filename, data); flash(btn, "Downloaded"); figMsg("");
 }
 async function exportPNG(dpi, btn){
-  flash(btn, "Rendering…");
+  if(btn.disabled) return;
+  flash(btn, "Rendering…", 0);           // stays until rendering finishes
+  btn.disabled = true;
   try {
     const blob = await rasterize(dpi);
     if(!blob) throw new Error("empty image");
     await saveFile(figName("png"), blob, btn);
   } catch(err){
+    flash(btn, "Failed");
     figMsg(`PNG export failed: ${esc(err.message)}. The SVG export is unaffected.`, "warn");
+  } finally {
+    btn.disabled = false;
   }
 }
 $("b-png").addEventListener("click", e => exportPNG(300, e.target));
