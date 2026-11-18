@@ -507,8 +507,8 @@ function renderRegion(){
   const svg = document.getElementById("svg-region");
   const box = document.getElementById("cb-region");
   const W = Math.max(280, box.clientWidth || 420);
-  const H = Math.max(240, Math.min(360, W*0.78));
-  const m = {t:14, r:16, b:40, l:52};
+  const H = Math.max(260, Math.min(400, W*0.8));
+  const m = {t:16, r:18, b:48, l:60};
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
@@ -531,12 +531,12 @@ function renderRegion(){
   const xt = niceTicks(x0, x1, 5), yt = niceTicks(y0, y1, 5);
   for(const t of xt) g += `<line x1="${SX(t)}" y1="${m.t}" x2="${SX(t)}" y2="${m.t+ih}" stroke="${grid}" stroke-width="1"/>`;
   for(const t of yt) g += `<line x1="${m.l}" y1="${SY(t)}" x2="${m.l+iw}" y2="${SY(t)}" stroke="${grid}" stroke-width="1"/>`;
-  for(const t of xt) g += `<text x="${SX(t)}" y="${m.t+ih+15}" fill="${ink3}" font-size="10" font-family="${css('--mono')||'monospace'}" text-anchor="middle">${t}</text>`;
-  for(const t of yt) g += `<text x="${m.l-7}" y="${SY(t)+3.5}" fill="${ink3}" font-size="10" font-family="monospace" text-anchor="end">${t}</text>`;
+  for(const t of xt) g += `<text x="${SX(t)}" y="${m.t+ih+18}" fill="${ink3}" font-size="12.5" font-family="${css('--mono')||'monospace'}" text-anchor="middle">${t}</text>`;
+  for(const t of yt) g += `<text x="${m.l-8}" y="${SY(t)+4.5}" fill="${ink3}" font-size="12.5" font-family="monospace" text-anchor="end">${t}</text>`;
   g += `<line x1="${m.l}" y1="${m.t+ih}" x2="${m.l+iw}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
   g += `<line x1="${m.l}" y1="${m.t}" x2="${m.l}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
-  g += `<text x="${m.l+iw/2}" y="${H-6}" fill="${ink2}" font-size="11" text-anchor="middle">Δμ(${S.axX}) — eV</text>`;
-  g += `<text transform="translate(12,${m.t+ih/2}) rotate(-90)" fill="${ink2}" font-size="11" text-anchor="middle">Δμ(${S.axY}) — eV</text>`;
+  g += `<text x="${m.l+iw/2}" y="${H-7}" fill="${ink2}" font-size="13.5" text-anchor="middle">Δμ(${S.axX}) — eV</text>`;
+  g += `<text transform="translate(15,${m.t+ih/2}) rotate(-90)" fill="${ink2}" font-size="13.5" text-anchor="middle">Δμ(${S.axY}) — eV</text>`;
 
   if(pts.length >= 3){
     const h = hull2(pts);
@@ -548,9 +548,9 @@ function renderRegion(){
 
   pts.forEach((p, i) => {
     const sel = i === S.selVtx;
-    g += `<circle class="vdot" data-i="${i}" cx="${SX(p[0])}" cy="${SY(p[1])}" r="${sel?6:4.5}"
+    g += `<circle class="vdot" data-i="${i}" cx="${SX(p[0])}" cy="${SY(p[1])}" r="${sel?7:5.5}"
            fill="${sel?acc:surf}" stroke="${acc}" stroke-width="2" style="cursor:pointer"/>`;
-    g += `<text x="${SX(p[0])+9}" y="${SY(p[1])-7}" fill="${ink}" font-size="10.5" font-weight="600" font-family="monospace">${String.fromCharCode(65+i)}</text>`;
+    g += `<text x="${SX(p[0])+9}" y="${SY(p[1])-7}" fill="${ink}" font-size="13" font-weight="600" font-family="monospace">${String.fromCharCode(65+i)}</text>`;
   });
 
   // current condition crosshair (when it is not exactly a vertex)
@@ -587,8 +587,8 @@ function renderMain(){
   const W = Math.max(300, box.clientWidth || 860);
   const narrow = W < 560;
   const H = Math.max(320, Math.min(560, W*(narrow ? 0.85 : 0.56)));
-  const labelRoom = S.showLbl && !narrow ? 86 : 16;
-  const m = {t:18, r:labelRoom, b:46, l:56};
+  const labelRoom = S.showLbl && !narrow ? 104 : 18;
+  const m = {t:22, r:labelRoom, b:54, l:64};
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
@@ -635,15 +635,15 @@ function renderMain(){
   // band edges
   g += `<line x1="${SX(0)}" y1="${m.t}" x2="${SX(0)}" y2="${m.t+ih}" stroke="${ink3}" stroke-width="1.5"/>`;
   g += `<line x1="${SX(gap)}" y1="${m.t}" x2="${SX(gap)}" y2="${m.t+ih}" stroke="${ink3}" stroke-width="1.5"/>`;
-  g += `<text x="${SX(0)+5}" y="${m.t+11}" fill="${ink3}" font-size="10" font-family="monospace" letter-spacing="0.5">VBM</text>`;
-  g += `<text x="${SX(gap)-5}" y="${m.t+11}" fill="${ink3}" font-size="10" font-family="monospace" letter-spacing="0.5" text-anchor="end">CBM</text>`;
+  g += `<text x="${SX(0)+5}" y="${m.t+14}" fill="${ink3}" font-size="12.5" font-family="monospace" letter-spacing="0.5">VBM</text>`;
+  g += `<text x="${SX(gap)-5}" y="${m.t+14}" fill="${ink3}" font-size="12.5" font-family="monospace" letter-spacing="0.5" text-anchor="end">CBM</text>`;
 
-  for(const t of yt) g += `<text x="${m.l-8}" y="${SY(t)+3.5}" fill="${ink3}" font-size="10.5" font-family="monospace" text-anchor="end">${t}</text>`;
-  for(const t of xt) g += `<text x="${SX(t)}" y="${m.t+ih+16}" fill="${ink3}" font-size="10.5" font-family="monospace" text-anchor="middle">${t}</text>`;
+  for(const t of yt) g += `<text x="${m.l-9}" y="${SY(t)+4.5}" fill="${ink3}" font-size="13" font-family="monospace" text-anchor="end">${t}</text>`;
+  for(const t of xt) g += `<text x="${SX(t)}" y="${m.t+ih+19}" fill="${ink3}" font-size="13" font-family="monospace" text-anchor="middle">${t}</text>`;
   g += `<line x1="${m.l}" y1="${m.t+ih}" x2="${m.l+iw}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
   g += `<line x1="${m.l}" y1="${m.t}" x2="${m.l}" y2="${m.t+ih}" stroke="${line2}" stroke-width="1"/>`;
-  g += `<text x="${m.l+iw/2}" y="${H-8}" fill="${ink2}" font-size="11.5" text-anchor="middle">Fermi level above VBM — eV</text>`;
-  g += `<text transform="translate(13,${m.t+ih/2}) rotate(-90)" fill="${ink2}" font-size="11.5" text-anchor="middle">Formation energy — eV</text>`;
+  g += `<text x="${m.l+iw/2}" y="${H-9}" fill="${ink2}" font-size="14" text-anchor="middle">Fermi level above VBM — eV</text>`;
+  g += `<text transform="translate(16,${m.t+ih/2}) rotate(-90)" fill="${ink2}" font-size="14" text-anchor="middle">Formation energy — eV</text>`;
 
   // faint all-charge-state lines behind the envelopes
   if(S.showAll){
@@ -663,7 +663,7 @@ function renderMain(){
     });
     if(pts.length){
       g += `<polyline points="${pts.map(p => p.join(",")).join(" ")}" fill="none"
-             stroke="${d.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+             stroke="${d.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"
              ${d.dash ? `stroke-dasharray="${d.dash}"` : ""}/>`;
     }
     // transition-level markers: 2px surface ring
@@ -674,9 +674,9 @@ function renderMain(){
     if(S.showLbl) for(const s of d.segs){
       const w = SX(s.x1) - SX(s.x0);
       if(w < 42) continue;
-      const spot = labelSpot(s, SX, SY, placed, {w:22, h:12, above:7, below:15, top:m.t+10, bottom:m.t+ih-2});
+      const spot = labelSpot(s, SX, SY, placed, {w:26, h:15, above:8, below:18, top:m.t+12, bottom:m.t+ih-2});
       if(!spot) continue;
-      g += `<text x="${spot[0]}" y="${spot[1]}" fill="${d.color}" font-size="10" font-weight="600"
+      g += `<text x="${spot[0]}" y="${spot[1]}" fill="${d.color}" font-size="12.5" font-weight="600"
              font-family="monospace" text-anchor="middle"
              paint-order="stroke" stroke="${surf}" stroke-width="3"
              stroke-linejoin="round">${sgn(s.q)}</text>`;
@@ -689,7 +689,7 @@ function renderMain(){
       const s = d.segs[d.segs.length-1];
       return {name:d.name, color:d.color, y:SY(s.A + s.q*s.x1)};
     }).sort((a, b) => a.y - b.y);
-    const MIN = 13;
+    const MIN = 16;
     for(let i = 1; i < lab.length; i++)
       if(lab[i].y - lab[i-1].y < MIN) lab[i].y = lab[i-1].y + MIN;
     if(lab.length){
@@ -699,7 +699,7 @@ function renderMain(){
     }
     for(const L of lab){
       g += `<line x1="${m.l+iw+2}" y1="${L.y}" x2="${m.l+iw+8}" y2="${L.y}" stroke="${L.color}" stroke-width="2"/>`;
-      g += `<text x="${m.l+iw+11}" y="${L.y+3.5}" fill="${ink}" font-size="10.5" font-family="monospace">${esc(L.name)}</text>`;
+      g += `<text x="${m.l+iw+11}" y="${L.y+3.5}" fill="${ink}" font-size="13" font-family="monospace">${esc(L.name)}</text>`;
     }
   }
 
@@ -786,10 +786,10 @@ function renderDmuInputs(){
   const p = S.elements[S.pivot];
   $("dmu-inputs").innerHTML = S.elements.map(e => `
     <div class="flexline" style="gap:8px">
-      <span class="lbl" style="width:56px;text-transform:none">Δμ(${e})</span>
+      <span class="lbl" style="width:64px">Δμ(${e})</span>
       <input type="number" step="0.01" id="dmu-${e}" value="${S.dmu[e].toFixed(4)}"
         ${e===p?"disabled":""} style="flex:1" aria-label="Delta mu ${e}">
-      ${e===p?`<span class="muted mono" style="font-size:10px">solved</span>`:""}
+      ${e===p?`<span class="muted" style="font-size:13px">solved</span>`:""}
     </div>`).join("");
   for(const e of S.elements){
     if(e === p) continue;
@@ -841,12 +841,12 @@ function renderDopants(){
       return `<tr${i===S.selVtx?' style="font-weight:600"':""}><td>${String.fromCharCode(65+i)}</td><td class="num">${fx(s.v)}</td><td>${esc(s.src)}</td></tr>`;
     }).join("");
     return `<div class="stack" style="gap:6px">
-      <div class="flexline" style="gap:8px"><span class="lbl" style="width:56px;text-transform:none">Δμ(${esc(el)})</span>
-        <span class="mono" style="flex:1">${fx(st.v,4)}</span><span class="muted mono" style="font-size:10px">${esc(st.src)}</span></div>
+      <div class="flexline" style="gap:8px"><span class="lbl" style="width:64px">Δμ(${esc(el)})</span>
+        <span class="mono" style="flex:1">${fx(st.v,4)}</span><span class="muted" style="font-size:13px">${esc(st.src)}</span></div>
       <select id="dop-mode-${el}" aria-label="How Δμ(${esc(el)}) is set">${opts}</select>
       ${st.mode==="fixed" ? `<input type="number" step="0.01" id="dop-val-${el}" value="${st.v.toFixed(4)}" aria-label="Fixed Δμ ${esc(el)}">` : ""}
       ${notes}
-      ${S.verts.length ? `<div class="tbl-wrap"><table><thead><tr><th>Vertex</th><th class="num"><span class="nt">Δμ(${esc(el)})</span></th><th>set by</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
+      ${S.verts.length ? `<div class="tbl-wrap"><table><thead><tr><th>Vertex</th><th class="num">Δμ(${esc(el)})</th><th>set by</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
     </div>`;
   }).join("");
   for(const el of S.dopants){
@@ -870,8 +870,8 @@ function renderDnSummary(){
   for(const d of S.defects) if(!seen.has(d.name)) seen.set(d.name, d);
   const label = {"name":"from name", "columns, match name":"columns ✓ name", "columns":"columns (name not in standard notation)"};
   $("dn-summary").innerHTML = seen.size
-    ? `<div class="lbl" style="margin-bottom:4px;text-transform:none;letter-spacing:.04em">Δn USED</div>` +
-      [...seen.values()].map(d => `<div class="mono" style="font-size:11.5px">${esc(d.name)}: ${esc(fmtDn(d.dn))} <span class="muted">· ${esc(label[d.dnSource] || d.dnSource)}</span></div>`).join("")
+    ? `<div class="lbl" style="margin-bottom:4px">Δn used</div>` +
+      [...seen.values()].map(d => `<div class="mono" style="font-size:13.5px">${esc(d.name)}: ${esc(fmtDn(d.dn))} <span class="muted">· ${esc(label[d.dnSource] || d.dnSource)}</span></div>`).join("")
     : "";
   $("dn-summary").hidden = !seen.size;
 }
@@ -960,6 +960,9 @@ function draw(){
 }
 
 function readSystem(){
+  // Show the raw-energy help and the per-cell count only when they apply.
+  $("note-raw").hidden = $("host-type").value !== "total";
+  $("units-field").hidden = $("host-basis").value !== "cell";
   S.hostFormula = $("f-host").value.trim();
   const hc = parseFormula(S.hostFormula);
   if(!hc) throw Error("Enter a valid host formula, such as ZnO, In2O3 or CuInSe2.");
@@ -1630,7 +1633,7 @@ function renderSeriesRows(){
     return `<tr>
       <td><input type="checkbox" id="sv${i}" ${st.vis?"checked":""} aria-label="show ${esc(nm)}"></td>
       <td><input type="color" id="sc${i}" value="${st.color}" aria-label="color ${esc(nm)}"></td>
-      <td class="muted" style="font-size:11.5px">${esc(nm)}</td>
+      <td class="muted" style="font-size:13.5px">${esc(nm)}</td>
       <td style="width:100%"><input type="text" id="sl${i}" value="${esc(st.label)}" aria-label="label ${esc(nm)}"></td>
     </tr>`;
   }).join("") || `<tr><td class="muted">No defects loaded.</td></tr>`;
